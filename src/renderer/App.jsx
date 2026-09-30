@@ -38,7 +38,8 @@ function App() {
   const [findQuery, setFindQuery] = useState('');
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const webviewRefs = useRef({});
-  const [hiddenTabs, setHiddenTabs] = useState(new Set());
+
+  const visibleTabs = tabs.filter(t => !t._deleted);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
   const [backOnline, setBackOnline] = useState(false);
@@ -77,7 +78,7 @@ function App() {
 
   // Clock for empty state
   useEffect(() => {
-    if (tabs.length === 0) {
+    if (visibleTabs.length === 0) {
       const updateClock = () => {
         const now = new Date();
         const timeEl = document.getElementById('empty-clock');
@@ -90,7 +91,7 @@ function App() {
       const interval = setInterval(updateClock, 1000);
       return () => clearInterval(interval);
     }
-  }, [tabs.length, language]);
+  }, [visibleTabs.length, language]);
 
   useEffect(() => {
     const handler = () => createNewTab();
@@ -207,34 +208,31 @@ function App() {
   }, [homepage]);
 
   const closeTab = useCallback((tabId) => {
-    // Mark as closing so the webview stays mounted but hidden
-    setHiddenTabs(prev => new Set([...prev, tabId]));
-
-    // Switch away from this tab immediately if it is active
+    // Switch active tab immediately if closing the active one
     if (activeTabId === tabId) {
-      const remaining = tabs.filter(t => t.id !== tabId);
+      const remaining = tabs.filter(t => t.id !== tabId && !t._deleted);
       if (remaining.length > 0) setActiveTabId(remaining[remaining.length - 1].id);
     }
 
-    // Remove from state after 500ms — gives Electron time to finish teardown
-    setTimeout(() => {
-      // Clean up webview ref to prevent memory leak
-      if (webviewRefs.current[tabId]) {
-        try {
-          webviewRefs.current[tabId].src = 'about:blank';
-        } catch(e) {}
-        delete webviewRefs.current[tabId];
-      }
+    // Soft-delete only — hides the tab from the sidebar and from view
+    // immediately. We intentionally NEVER filter this tab out of `tabs`
+    // for the rest of the session. If we did, the <WebView> component
+    // would unmount and React would call removeChild on its <webview>
+    // DOM node, which crashes with "Invalid guestInstanceId" whenever
+    // Electron's guest process for that webview is not in a fully
+    // settled state (freshly navigated, freshly mounted, etc.) — and
+    // there is no reliable way to know that state in every case.
+    // Keeping the node in the DOM forever (just hidden) makes that crash
+    // structurally impossible instead of merely unlikely.
+    setTabs(prev => prev.map(t => t.id === tabId ? { ...t, _deleted: true } : t));
 
-      setTabs(prev => prev.filter(t => t.id !== tabId));
-
-      // Remove from hidden tabs set
-      setHiddenTabs(prev => {
-        const next = new Set(prev);
-        next.delete(tabId);
-        return next;
-      });
-    }, 500);
+    // Free the webview's rendering resources by navigating it to a blank
+    // page. This is safe now because the node is never removed from the
+    // DOM afterward — there is no unmount race to worry about.
+    const wv = webviewRefs.current[tabId];
+    if (wv) {
+      try { wv.src = 'about:blank'; } catch (e) {}
+    }
   }, [activeTabId, tabs]);
 
   const handleTabReorder = useCallback((from, to) => {
@@ -446,7 +444,7 @@ function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'row', height: '100vh', overflow: 'hidden', background: 'var(--bg)', position: 'relative' }} onClick={() => setContextMenu(null)}>
       <Sidebar
-        tabs={tabs}
+        tabs={visibleTabs}
         activeTabId={activeTabId}
         activeTab={activeTab}
         onTabSelect={(id) => {
@@ -592,7 +590,7 @@ function App() {
           borderRadius: 'var(--radius)',
           overflow: 'hidden'
         }}>
-          {tabs.length === 0 ? (
+          {visibleTabs.length === 0 ? (
             <div style={{
               position: 'absolute',
               inset: 0,
@@ -624,7 +622,7 @@ function App() {
                 <WebView
                   key={tab.id}
                   tab={tab}
-                  isActive={tab.id === activeTabId && !isInternal && !hiddenTabs.has(tab.id)}
+                  isActive={tab.id === activeTabId && !isInternal && !tab._deleted}
                   isSuspended={tab.suspended}
                   isIncognito={isIncognito}
                   webviewRefs={webviewRefs}

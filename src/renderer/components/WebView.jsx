@@ -10,9 +10,12 @@ const WebView = forwardRef(({ tab, isActive, isSuspended, isIncognito, webviewRe
   useEffect(() => {
     const wv = webviewRef.current;
     if (!wv) return;
+    // Only set src for non-cove:// URLs. cove:// pages are rendered as React components in App.jsx.
+    // The <webview> stays mounted regardless (never conditionally removed) to prevent guestInstanceId crash.
+    if (tab.url.startsWith('cove://')) return;
     if (isSuspended) {
       try { wv.src = 'about:blank'; } catch (e) { return; }
-    } else if (!tab.url.startsWith('cove://')) {
+    } else {
       try { wv.src = tab.url; } catch (e) { return; }
     }
   }, [tab.url, tab.id, isSuspended]);
@@ -32,44 +35,60 @@ const WebView = forwardRef(({ tab, isActive, isSuspended, isIncognito, webviewRe
     };
 
     const onReady = () => {
+      if (tab._deleted) return;
       applyTheme();
       try {
-        onTabUpdate(tab.id, { title: wv.getTitle() || 'New Tab', url: wv.getURL() });
+        const title = wv.getTitle();
+        const url = wv.getURL();
+        // Only update if it's a real URL, not about:blank from suspension
+        if (url && url !== 'about:blank') {
+          onTabUpdate(tab.id, { title: title || 'New Tab', url });
+        } else if (!url || url === 'about:blank') {
+          onTabUpdate(tab.id, { title: title || 'New Tab' });
+        }
       } catch (e) { return; }
     };
 
-    const onTitle = (e) => onTabUpdate(tab.id, { title: e.title });
-    const onFavicon = (e) => { if (e.favicons?.[0]) onTabUpdate(tab.id, { favicon: e.favicons[0] }); };
+    const onTitle = (e) => { if (!tab._deleted && e.title) onTabUpdate(tab.id, { title: e.title }); };
+
+    const onFavicon = (e) => { if (!tab._deleted && e.favicons?.[0]) onTabUpdate(tab.id, { favicon: e.favicons[0] }); };
+
+    const getNavState = (wv) => {
+      try {
+        if (wv && wv.navigationHistory) {
+          return {
+            canGoBack: wv.navigationHistory.canGoBack(),
+            canGoForward: wv.navigationHistory.canGoForward()
+          };
+        }
+      } catch (e) {}
+      return {};
+    };
 
     const onNavigate = (e) => {
-      onTabUpdate(tab.id, { url: e.url });
-      try {
-        if (wv && wv.navigationHistory && tab.id === activeTabId) {
-          onTabUpdate(tab.id, {
-            canGoBack: wv.navigationHistory.canGoBack(),
-            canGoForward: wv.navigationHistory.canGoForward()
-          });
-        }
-      } catch (e) { return; }
+      if (tab._deleted || !e.url || e.url === 'about:blank') return;
+      const updates = { url: e.url, failedLoad: false };
+      if (tab.id === activeTabId) {
+        Object.assign(updates, getNavState(wv));
+      }
+      onTabUpdate(tab.id, updates);
     };
 
-    const onStart = () => onTabUpdate(tab.id, { isLoading: true });
+    const onStart = () => { if (!tab._deleted) onTabUpdate(tab.id, { isLoading: true }); };
 
     const onStop = () => {
-      onTabUpdate(tab.id, { isLoading: false });
-      try {
-        if (wv && wv.navigationHistory && tab.id === activeTabId) {
-          onTabUpdate(tab.id, {
-            canGoBack: wv.navigationHistory.canGoBack(),
-            canGoForward: wv.navigationHistory.canGoForward()
-          });
-        }
-      } catch (e) { return; }
+      if (tab._deleted) return;
+      const updates = { isLoading: false };
+      if (tab.id === activeTabId) {
+        Object.assign(updates, getNavState(wv));
+      }
+      onTabUpdate(tab.id, updates);
     };
 
     const onHover = (e) => onHoveredLink(e.url || '');
 
     const onFailLoad = (e) => {
+      if (tab._deleted) return;
       if (e.errorCode === -3) return;
       onTabUpdate(tab.id, {
         failedLoad: true,
@@ -146,14 +165,18 @@ const WebView = forwardRef(({ tab, isActive, isSuspended, isIncognito, webviewRe
         pointerEvents: isActive ? 'auto' : 'none'
       }}
     >
-      {!tab.url.startsWith('cove://') && (
-        <webview
-          ref={webviewRef}
-          partition={isIncognito ? 'incognito' : 'persist:cove'}
-          webpreferences="contextIsolation=true, javascript=true, images=true, scrollbounce=true"
-          style={{ width: '100%', height: '100%', border: 'none', display: 'flex' }}
-        />
-      )}
+      {/* 
+        ALWAYS render the webview element regardless of URL type.
+        Conditionally mounting/unmounting causes Electron's guestInstanceId crash
+        because React removes the DOM node while Electron still holds a reference to it.
+        For cove:// pages, the webview just stays hidden behind the React page rendered in App.jsx.
+      */}
+      <webview
+        ref={webviewRef}
+        partition={isIncognito ? 'incognito' : 'persist:cove'}
+        webpreferences="contextIsolation=true, javascript=true, images=true, scrollbounce=true"
+        style={{ width: '100%', height: '100%', border: 'none', display: 'flex' }}
+      />
     </div>
   );
 });

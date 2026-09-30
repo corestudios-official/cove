@@ -7,26 +7,50 @@
   
   A minimal, beautiful browser built for Windows. Sidebar tabs, warm design, and a browsing experience that stays out of your way.
 
-  [![Release](https://img.shields.io/badge/Version-1.1.0_Beta-7B9BB5?style=flat-square)](https://github.com/Cove-Browser/cove/releases)
+  [![Release](https://img.shields.io/badge/Version-2.0.0-7B9BB5?style=flat-square)](https://github.com/Cove-Browser/cove/releases)
   [![Platform](https://img.shields.io/badge/Platform-Windows-blue?style=flat-square)](https://github.com/Cove-Browser/cove/releases)
   [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 </div>
 
 ## Download
 
- **[Download Cove Browser Beta 1.1.0](https://github.com/Cove-Browser/cove/releases/latest)**
+**[Download Cove Browser 2.0.0](https://github.com/Cove-Browser/cove/releases/latest)**
 
 Windows 10/11 · x64 · Free & Open Source
 
+## What's New in 2.0.0
+
+- 6 new languages — Bahasa Malaysia, Chinese, Korean, French, German, Japanese, and Russian
+- Cove Password Manager, secured by Windows DPAPI
+- Incognito Window
+- Search suggestions as you type
+- Digital Wellbeing — track and manage your screen time
+- Personalised profile with 4 preset avatars
+
 ## Features
 
+**Browsing**
 - Sidebar tab navigation
-- Bookmarks, History, Downloads manager
-- Dark and Light mode
+- Incognito Window
 - Find in page (Ctrl+F)
 - Zoom controls
 - Custom search engine (Google, DuckDuckGo, Bing)
-- Privacy-focused — no telemetry, no tracking
+- Search suggestions as you type
+
+**Privacy & Security**
+- No telemetry, no tracking — fully local
+- Cove Password Manager, secured by Windows DPAPI
+
+**Organisation**
+- Bookmarks, History, and Downloads manager
+- Personalised profile with 4 preset avatars
+
+**Wellbeing**
+- Digital Wellbeing — track and manage your screen time
+
+**Appearance**
+- Dark and Light mode
+- Available in 7 languages — English, Bahasa Malaysia, Chinese, Korean, French, German, Japanese, and Russian
 
 ## Built With
 
