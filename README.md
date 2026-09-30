@@ -20,11 +20,11 @@ Windows 10/11 · x64 · Free & Open Source
 
 ## What's New in 2.0.0
 
-- 6 new languages — Bahasa Malaysia, Chinese, Korean, French, German, Japanese, and Russian
+- 6 new languages: Bahasa Malaysia, Chinese, Korean, French, German, Japanese, and Russian
 - Cove Password Manager, secured by Windows DPAPI
 - Incognito Window
 - Search suggestions as you type
-- Digital Wellbeing — track and manage your screen time
+- Digital Wellbeing
 - Personalised profile with 4 preset avatars
 
 ## Features
@@ -38,7 +38,7 @@ Windows 10/11 · x64 · Free & Open Source
 - Search suggestions as you type
 
 **Privacy & Security**
-- No telemetry, no tracking — fully local
+- No telemetry, no tracking, fully local
 - Cove Password Manager, secured by Windows DPAPI
 
 **Organisation**
@@ -46,11 +46,11 @@ Windows 10/11 · x64 · Free & Open Source
 - Personalised profile with 4 preset avatars
 
 **Wellbeing**
-- Digital Wellbeing — track and manage your screen time
+- Digital Wellbeing
 
 **Appearance**
 - Dark and Light mode
-- Available in 7 languages — English, Bahasa Malaysia, Chinese, Korean, French, German, Japanese, and Russian
+- Available in 7 languages: English, Bahasa Malaysia, Chinese, Korean, French, German, Japanese, and Russian
 
 ## Built With
 
