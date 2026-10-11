@@ -1,67 +1,34 @@
 <div align="center">
-  <img src="icon-256.png" width="80" height="80" />
-  
-  # Cove Browser
-  
-  **Browse with calm.**
-  
-  A minimal, beautiful browser built for Windows. Sidebar tabs, warm design, and a browsing experience that stays out of your way.
 
-  [![Release](https://img.shields.io/badge/Version-2.0.0-7B9BB5?style=flat-square)](https://github.com/Cove-Browser/cove/releases)
-  [![Platform](https://img.shields.io/badge/Platform-Windows-blue?style=flat-square)](https://github.com/Cove-Browser/cove/releases)
-  [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+<img src="icon-256.png" alt="Cove Browser" width="96" />
+
+# Cove Browser
+
+**Browse with calm.**
+
+A free, open-source desktop browser built to stay out of your way. No bloat, no noise — just the web.
+
+[Website](https://corestudios.web.app/cove.html) · [Download](https://github.com/corestudios-official/cove/releases/latest) · [Installation Guide](INSTALL.md)
+
 </div>
 
-## Download
+---
 
-**[Download Cove Browser 2.0.0](https://github.com/Cove-Browser/cove/releases/latest)**
+## About
 
-Windows 10/11 · x64 · Free & Open Source
+Cove is a desktop browser for Windows built with Electron and React. It's designed around one idea — that a browser should stay out of your way. No telemetry, no tracking, no account required. Everything stays on your device.
 
-## What's New in 2.0.0
+## Open Source
 
-- 6 new languages: Bahasa Malaysia, Chinese, Korean, French, German, Japanese, and Russian
-- Cove Password Manager, secured by Windows DPAPI
-- Incognito Window
-- Search suggestions as you type
-- Digital Wellbeing
-- Personalised profile with 4 preset avatars
-
-## Features
-
-**Browsing**
-- Sidebar tab navigation
-- Incognito Window
-- Find in page (Ctrl+F)
-- Zoom controls
-- Custom search engine (Google, DuckDuckGo, Bing)
-- Search suggestions as you type
-
-**Privacy & Security**
-- No telemetry, no tracking, fully local
-- Cove Password Manager, secured by Windows DPAPI
-
-**Organisation**
-- Bookmarks, History, and Downloads manager
-- Personalised profile with 4 preset avatars
-
-**Wellbeing**
-- Digital Wellbeing
-
-**Appearance**
-- Dark and Light mode
-- Available in 7 languages: English, Bahasa Malaysia, Chinese, Korean, French, German, Japanese, and Russian
+Cove is free to download, free to use, and open source. The full source code is here on GitHub.
 
 ## Built With
 
-- Electron
-- React
-- Chromium
-- Font Awesome
+- [Electron](https://www.electronjs.org/) · [React](https://react.dev/) · [Chromium](https://www.chromium.org/)
 
 ## Acknowledgements
 
-Built with the help of Claude (Anthropic) and Windsurf (Codeium).
+Built with the help of [Claude](https://claude.ai) (Anthropic) and [Windsurf](https://codeium.com/windsurf) (Codeium).
 
 ## License
 

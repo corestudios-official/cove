@@ -7,4 +7,4 @@ const path = require('path');
 
 console.log('Installer assets ready.');
 console.log('Note: For a custom installer sidebar, create a 164x314 BMP file named installer-sidebar.bmp in the project root.');
-console.log('The sidebar should use Cove colors: background #EDE8D0, accent #E17E45');
+console.log('The sidebar should use Cove colors: background #EDE8D0, accent #7B9BB5');
