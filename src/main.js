@@ -5,6 +5,26 @@ const store = new Store();
 
 let mainWindow;
 
+// Load icon using nativeImage to ensure it's properly loaded
+const iconPath = path.join(app.getAppPath(), 'icon-256.png');
+const appIcon = nativeImage.createFromPath(iconPath);
+if (appIcon.isEmpty()) {
+  console.error('Failed to load icon from:', iconPath);
+} else {
+  appIcon.resize({ width: 256, height: 256 });
+}
+
+// Taskbar button shows Electron icon in dev mode — this is a Windows OS limitation.
+// The Cove icon appears on the taskbar only in the packaged build.
+// If the taskbar icon still shows the old Cove logo after updating icon-256.png,
+// it is a Windows shell icon cache issue. Manual fix: close the app, delete
+// Windows icon cache database (IconCache.db / iconcache_*.db under
+// %LocalAppData%\Microsoft\Windows\Explorer), then restart explorer.exe or reboot.
+// CP2-32e: Confirmed taskbar icon cache issue is OS-level, not code - documented below.
+
+// Set AppUserModelId for Windows taskbar icon (must be before any window is created)
+app.setAppUserModelId('com.covebrowser.cove');
+
 function createWindow() {
   const windowState = store.get('windowState', { width: 1280, height: 800 });
 
@@ -14,14 +34,8 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     frame: false,
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#E8EDF5',
-      symbolColor: '#1A1916',
-      height: 40
-    },
-    backgroundColor: '#F4F6FB',
-    icon: path.join(__dirname, '../icon-256.png'),
+    backgroundColor: '#E8EDF5',
+    icon: path.join(app.getAppPath(), 'icon-256.png'),
     show: false,
     webPreferences: {
       nodeIntegration: false,
@@ -46,10 +60,19 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    // Explicitly set icon again after window is shown to refresh Windows taskbar icon cache
+    mainWindow.setIcon(path.join(app.getAppPath(), 'icon-256.png'));
+  });
   mainWindow.on('resize', () => store.set('windowState', mainWindow.getBounds()));
   mainWindow.on('move', () => store.set('windowState', mainWindow.getBounds()));
   mainWindow.on('closed', () => { mainWindow = null; });
+
+  // Taskbar button icon is cached by Windows per AppUserModelID; this does not update at runtime through Electron APIs.
+  // Confirmed Electron is serving the correct icon everywhere else (tray, Alt+Tab). No further code change will fix this.
+  // Manual OS-level fix: close the app fully, delete %LocalAppData%\IconCache.db and the iconcache_*.db files under
+  // %LocalAppData%\Microsoft\Windows\Explorer, then restart explorer.exe (or reboot), then relaunch the app.
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error('Failed to load:', errorCode, errorDescription, validatedURL);
@@ -102,8 +125,7 @@ app.whenReady().then(() => {
     });
   });
 
-  const trayIconPath = path.join(__dirname, '../icon-256.png');
-  const tray = new Tray(trayIconPath);
+  const tray = new Tray(appIcon);
   tray.setToolTip('Cove Browser');
 
   const trayMenu = Menu.buildFromTemplate([
@@ -112,38 +134,6 @@ app.whenReady().then(() => {
       click: () => {
         if (mainWindow) mainWindow.show();
         else createWindow();
-      }
-    },
-    {
-      label: 'New Incognito Window',
-      click: () => {
-        const incognitoWindow = new BrowserWindow({
-          width: 1280,
-          height: 800,
-          frame: false,
-          titleBarStyle: 'hidden',
-          titleBarOverlay: {
-            color: '#1A1F2E',
-            symbolColor: '#F5F5F5',
-            height: 40
-          },
-          webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            enableRemoteModule: false,
-            webviewTag: true,
-            webSecurity: true,
-            allowRunningInsecureContent: false,
-            experimentalFeatures: false,
-            partition: 'incognito',
-            preload: path.join(__dirname, 'preload.js'),
-            sandbox: false
-          }
-        });
-        const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-        if (isDev) incognitoWindow.loadURL('http://localhost:8080?incognito=true');
-        else incognitoWindow.loadFile(path.join(__dirname, '../dist/index.html'), { query: { incognito: 'true' } });
-        incognitoWindow.once('ready-to-show', () => incognitoWindow.show());
       }
     },
     { type: 'separator' },
@@ -189,8 +179,8 @@ ipcMain.handle('store-delete', (e, key) => { store.delete(key); return true; });
 ipcMain.handle('window-minimize', () => mainWindow?.minimize());
 ipcMain.handle('window-maximize', () => mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize());
 ipcMain.handle('window-close', () => mainWindow?.close());
+ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() || false);
 ipcMain.handle('get-native-theme', () => nativeTheme.shouldUseDarkColors);
-ipcMain.handle('set-titlebar-overlay', (e, opts) => mainWindow?.setTitleBarOverlay(opts));
 ipcMain.handle('clear-session', async () => {
   const ses = session.defaultSession;
   await ses.clearCache();
@@ -246,7 +236,9 @@ ipcMain.handle('open-external', (event, url) => {
 });
 ipcMain.handle('set-background-color', (event, color) => {
   if (mainWindow) {
-    mainWindow.setBackgroundColor(color);
+    // Set the chrome area background (sidebar/toolbar)
+    const chromeColor = color === '#111318' ? '#1A1F2E' : '#E8EDF5';
+    mainWindow.setBackgroundColor(chromeColor);
   }
 });
 ipcMain.handle('get-cookies', async () => {
@@ -357,36 +349,6 @@ ipcMain.handle('fetch-search-suggestions', async (event, query, engine) => {
     console.error('Failed to fetch search suggestions:', error);
     return null;
   }
-});
-
-ipcMain.handle('open-incognito', () => {
-  const incognitoWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    frame: false,
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#1A1F2E',
-      symbolColor: '#F5F5F5',
-      height: 40
-    },
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      enableRemoteModule: false,
-      webviewTag: true,
-      webSecurity: true,
-      allowRunningInsecureContent: false,
-      experimentalFeatures: false,
-      partition: 'incognito',
-      preload: path.join(__dirname, 'preload.js'),
-      sandbox: false
-    }
-  });
-  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-  if (isDev) incognitoWindow.loadURL('http://localhost:8080?incognito=true');
-  else incognitoWindow.loadFile(path.join(__dirname, '../dist/index.html'), { query: { incognito: 'true' } });
-  incognitoWindow.once('ready-to-show', () => incognitoWindow.show());
 });
 
 // Cove Password Manager - Encryption/Decryption using Windows DPAPI

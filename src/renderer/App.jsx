@@ -1,7 +1,7 @@
-// CP2-7 FIX: Incognito dark mode bleeding fixed by usingTheme hook that skips store persistence
-// in incognito mode. This file also forces dark theme visually for incognito without persisting.
 // CP2-9 FIX: Removed all RTL (Right-to-Left) layout logic since Arabic language support was removed.
 // Removed isRTL state, document.dir setting, Arabic time formatting (ar-SA), and RTL context menu positioning.
+// CP2-32e FIX: Pass full tabs array to Sidebar (not filtered visibleTabs) so closing animation can play
+// CP2-32f FIX: Removed incognito mode entirely
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from './hooks/useTheme';
 import { useStore } from './hooks/useStore';
@@ -45,7 +45,7 @@ function App() {
   const [backOnline, setBackOnline] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
-  const isIncognito = new URLSearchParams(window.location.search).get('incognito') === 'true';
+  const [isSidebarDragging, setIsSidebarDragging] = useState(false);
 
   const homepage = settings?.homepage || 'cove://home';
 
@@ -55,26 +55,15 @@ function App() {
     }
   }, [language, i18n]);
 
-  // CP2-7 FIX: Incognito dark mode was bleeding into normal window because setTheme('dark')
-  // was saving to the shared electron-store. Fixed by using setTheme which now checks incognito
-  // mode and skips persistence when in incognito mode (see useTheme.js).
-  useEffect(() => {
-    if (isIncognito) {
-      setTheme('dark');
-    }
-  }, [isIncognito, setTheme]);
+  const resolvedSettings = settings ?? { homepage: 'cove://home' };
+  const resolvedProfile = profile ?? { displayName: 'User', avatar: null };
 
-  if (settings === null || profile === null) {
-    return <div style={{ width: '100vw', height: '100vh', background: 'var(--bg)' }} />;
-  }
-
+  // Auto-open new tab when all tabs are closed (including on first launch)
   useEffect(() => {
-    if (tabs.length === 0) {
-      const t = { id: Date.now().toString(), url: homepage, title: 'New Tab', favicon: null, isLoading: false, canGoBack: false, canGoForward: false, lastActive: Date.now(), suspended: false };
-      setTabs([t]);
-      setActiveTabId(t.id);
+    if (visibleTabs.length === 0) {
+      createNewTab();
     }
-  }, []);
+  }, [visibleTabs.length, createNewTab]);
 
   // Clock for empty state
   useEffect(() => {
@@ -152,29 +141,27 @@ function App() {
   // the timer only ran on app close. Fixed by adding a persistent 60-second interval
   // timer that increments and saves to storage continuously from app launch.
   useEffect(() => {
-    if (isIncognito) return;
-
     const updateSessionTime = async () => {
       const today = new Date().toISOString().split('T')[0];
       const sessions = await window.electronAPI.storeGet('wellbeing-sessions') || [];
-      
+
       // Find today's record
       const todayIndex = sessions.findIndex(s => s.date === today);
       const updatedSessions = [...sessions];
-      
+
       if (todayIndex >= 0) {
         updatedSessions[todayIndex].minutes += 1;
       } else {
         updatedSessions.push({ date: today, minutes: 1 });
       }
-      
+
       // Delete records older than 14 days
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 14);
       const filteredSessions = updatedSessions.filter(s => new Date(s.date) >= cutoff);
-      
+
       await window.electronAPI.storeSet('wellbeing-sessions', filteredSessions);
-      
+
       // Check against goal
       const goalMinutes = await window.electronAPI.storeGet('wellbeing-goal');
       if (goalMinutes) {
@@ -192,7 +179,7 @@ function App() {
     const intervalId = setInterval(updateSessionTime, 60000); // Every 60 seconds
 
     return () => clearInterval(intervalId);
-  }, [isIncognito]);
+  }, []);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
   const isBookmarked = bookmarks?.some(b => b.url === activeTab?.url) || false;
@@ -202,7 +189,7 @@ function App() {
   }, []);
 
   const createNewTab = useCallback(() => {
-    const t = { id: Date.now().toString(), url: homepage, title: 'New Tab', favicon: null, isLoading: false, canGoBack: false, canGoForward: false, lastActive: Date.now(), suspended: false };
+    const t = { id: crypto.randomUUID(), url: homepage, title: 'New Tab', favicon: null, isLoading: false, canGoBack: false, canGoForward: false, lastActive: Date.now(), suspended: false };
     setTabs(prev => [...prev, t]);
     setActiveTabId(t.id);
   }, [homepage]);
@@ -248,7 +235,7 @@ function App() {
     const tab = tabs.find(t => t.id === tabId);
     if (!tab) return;
     const newTab = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       url: tab.url,
       title: tab.title,
       favicon: null,
@@ -325,14 +312,14 @@ function App() {
     if (url.startsWith('cove://')) updates.favicon = null;
     updateTab(tabId, updates);
 
-    if (!url.startsWith('cove://') && !isIncognito) {
+    if (!url.startsWith('cove://')) {
       window.electronAPI.storeGet('history').then(h => {
         const history = h || [];
         history.unshift({ id: Date.now().toString(), url, title: url, timestamp: Date.now() });
         window.electronAPI.storeSet('history', history.slice(0, 500));
       });
     }
-  }, [updateTab, activeTab, isIncognito]);
+  }, [updateTab, activeTab]);
 
   const handleBack = useCallback(() => {
     const wv = webviewRefs.current[activeTabId];
@@ -355,7 +342,7 @@ function App() {
 
   const handleOpenInNewTab = useCallback((url) => {
     const t = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       url,
       title: 'New Tab',
       favicon: null,
@@ -444,12 +431,12 @@ function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'row', height: '100vh', overflow: 'hidden', background: 'var(--bg)', position: 'relative' }} onClick={() => setContextMenu(null)}>
       <Sidebar
-        tabs={visibleTabs}
+        tabs={tabs}
         activeTabId={activeTabId}
         activeTab={activeTab}
         onTabSelect={(id) => {
           setActiveTabId(id);
-          setTabs(prev => prev.map(t => 
+          setTabs(prev => prev.map(t =>
             t.id === id ? { ...t, lastActive: Date.now(), suspended: false } : t
           ));
         }}
@@ -458,14 +445,6 @@ function App() {
         onTabReorder={handleTabReorder}
         onDuplicateTab={duplicateTab}
         onNavigate={(url) => {
-          // Block incognito-incompatible pages
-          if (isIncognito && (url === 'cove://history' || url === 'cove://downloads' || url === 'cove://profile')) {
-            if (activeTabId) {
-              navigateTab(activeTabId, 'cove://home');
-            }
-            return;
-          }
-
           // Always open internal cove:// pages in a new tab, except settings which opens as modal
           const pageTitles = {
             'cove://bookmarks': 'Bookmarks',
@@ -477,7 +456,7 @@ function App() {
             'cove://acknowledgements': 'Acknowledgements',
             'cove://cpm': 'Cove Password Manager'
           };
-          
+
           if (url === 'cove://settings') {
             setShowSettingsModal(true);
             // Close any existing settings tab
@@ -487,7 +466,7 @@ function App() {
             }
             return;
           }
-          
+
           if (url.startsWith('cove://')) {
             // Check if a tab with this URL already exists
             const existing = tabs.find(t => t.url === url);
@@ -497,7 +476,7 @@ function App() {
             } else {
               // Open in new tab
               const t = {
-                id: Date.now().toString(),
+                id: crypto.randomUUID(),
                 url,
                 title: pageTitles[url] || 'New Tab',
                 favicon: null,
@@ -516,16 +495,16 @@ function App() {
         }}
         isDark={isDark}
         profile={profile}
-        isIncognito={isIncognito}
+        onDragStart={() => setIsSidebarDragging(true)}
+        onDragEnd={() => setIsSidebarDragging(false)}
       />
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        padding: '0 8px 8px 0',
         gap: 0,
-        background: 'var(--bg)'
+        background: 'var(--surface)'
       }}>
         {showOfflineBanner && (
           <div style={{
@@ -554,7 +533,7 @@ function App() {
           onNavigate={(url) => navigateTab(activeTabId, url)}
           onNavigateNew={(url) => {
             const t = {
-              id: Date.now().toString(),
+              id: crypto.randomUUID(),
               url,
               title: 'New Tab',
               favicon: null,
@@ -581,13 +560,15 @@ function App() {
           searchEngine={searchEngine || 'google'}
           isDark={isDark}
           hoveredLink={hoveredLink}
-          isIncognito={isIncognito}
         />
         <div style={{
           flex: 1,
           position: 'relative',
-          background: 'var(--webview-bg)',
-          borderRadius: 'var(--radius)',
+          background: 'var(--surface)',
+          borderTopLeftRadius: 'var(--viewing-window-radius)',
+          borderTopRightRadius: 'var(--viewing-window-radius)',
+          borderBottomLeftRadius: '0',
+          borderBottomRightRadius: '0',
           overflow: 'hidden'
         }}>
           {visibleTabs.length === 0 ? (
@@ -624,7 +605,6 @@ function App() {
                   tab={tab}
                   isActive={tab.id === activeTabId && !isInternal && !tab._deleted}
                   isSuspended={tab.suspended}
-                  isIncognito={isIncognito}
                   webviewRefs={webviewRefs}
                   onTabUpdate={updateTab}
                   onHoveredLink={setHoveredLink}
@@ -653,7 +633,8 @@ function App() {
                   zIndex: 2,
                   overflowY: 'auto',
                   overflowX: 'hidden',
-                  background: 'var(--webview-bg)'
+                  background: 'var(--webview-bg)',
+                  paddingTop: '40px'
                 }}>
                   {renderPage()}
                 </div>
@@ -667,6 +648,15 @@ function App() {
                   onClose={() => { setShowFindBar(false); setFindQuery(''); const wv = webviewRefs.current[activeTabId]; if(wv) try { wv.stopFindInPage('clearSelection'); } catch(e){} }}
                   isDark={isDark}
                 />
+              )}
+              {/* Transparent overlay during sidebar drag to prevent webview from swallowing mouse events */}
+              {isSidebarDragging && (
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 100,
+                  pointerEvents: 'auto'
+                }} />
               )}
             </>
           )}

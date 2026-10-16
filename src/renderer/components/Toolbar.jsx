@@ -2,11 +2,13 @@
 // onBlur event fired before the suggestion button's onClick could register, causing
 // the dropdown to unmount before the click completed. Fixed by changing onClick to
 // onMouseDown on suggestion items, which fires before onBlur and prevents the race condition.
+// CP2-32e FIX: Changed close button hover background from red to gray to match minimize/maximize
+// CP2-32f FIX: Removed incognito mode entirely
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import ContextMenu from './ContextMenu';
 
-export default function Toolbar({ activeTab, onNavigate, onNavigateNew, onBack, onForward, onRefresh, onStop, isDark, hoveredLink, isBookmarked, onToggleBookmark, onHome, zoomLevel, onZoomIn, onZoomOut, onResetZoom, searchEngine, isIncognito }) {
+export default function Toolbar({ activeTab, onNavigate, onNavigateNew, onBack, onForward, onRefresh, onStop, isDark, hoveredLink, isBookmarked, onToggleBookmark, onHome, zoomLevel, onZoomIn, onZoomOut, onResetZoom, searchEngine }) {
   const { t } = useTranslation();
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
@@ -117,7 +119,8 @@ export default function Toolbar({ activeTab, onNavigate, onNavigateNew, onBack, 
       style={{
         fontSize: 13,
         flexShrink: 0,
-        color: disabled ? 'var(--text-muted)' : (color || 'var(--text-muted)')
+        color: disabled ? 'var(--text-muted)' : (color || 'var(--text-muted)'),
+        WebkitAppRegion: 'no-drag'
       }}
     >
       <i className={icon} />
@@ -125,13 +128,12 @@ export default function Toolbar({ activeTab, onNavigate, onNavigateNew, onBack, 
   );
 
   const menuItems = [
-    { label: 'New Incognito Window', action: () => window.electronAPI.openIncognito() },
-    null,
     { label: t('sidebar.newTab'), action: () => window.dispatchEvent(new CustomEvent('newTab')) },
     { label: t('sidebar.bookmarks'), action: () => onNavigate('cove://bookmarks') },
     { label: t('sidebar.history'), action: () => onNavigate('cove://history') },
     { label: t('sidebar.downloads'), action: () => onNavigate('cove://downloads') },
-    ...(isIncognito ? [] : [{ label: 'Cove Password Manager', action: () => onNavigate('cove://cpm') }]),
+    { label: 'Cove Password Manager', action: () => onNavigate('cove://cpm') },
+    { label: 'Profile', action: () => onNavigate('cove://profile') },
     null,
     { label: t('sidebar.settings'), action: () => onNavigate('cove://settings') }
   ];
@@ -143,11 +145,14 @@ export default function Toolbar({ activeTab, onNavigate, onNavigateNew, onBack, 
       display: 'flex',
       alignItems: 'center',
       padding: '0 16px',
-      paddingRight: '140px',
+      paddingRight: '8px',
       gap: 8,
-      paddingBottom: 8,
-      flexShrink: 0
-    }}>
+      paddingBottom: 4,
+      flexShrink: 0,
+      WebkitAppRegion: 'drag'
+    }}
+    onDoubleClick={() => window.electronAPI.maximize()}
+    >
       {/* Left nav buttons */}
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
         {iconBtn(() => { try { onBack(); } catch(e) {} }, 'fas fa-arrow-left', !hasTab || !canGoBack, t('toolbar.back'))}
@@ -175,13 +180,14 @@ export default function Toolbar({ activeTab, onNavigate, onNavigateNew, onBack, 
             gap: 8,
             cursor: 'text',
             width: '100%',
-            maxWidth: '835px'
+            maxWidth: '835px',
+            WebkitAppRegion: 'no-drag'
           }}
         >
           {url.startsWith('https://') && (
             <i
               className={copied ? 'fas fa-check' : 'fas fa-lock'}
-              style={{ fontSize: 11, color: copied ? '#4CAF50' : '#4CAF50', flexShrink: 0, cursor: 'pointer' }}
+              style={{ fontSize: 11, color: copied ? '#4CAF50' : '#4CAF50', flexShrink: 0, cursor: 'pointer', WebkitAppRegion: 'no-drag' }}
               title={copied ? 'Copied!' : 'Click to copy URL'}
               onClick={() => {
                 window.electronAPI.copyToClipboard(url);
@@ -193,7 +199,7 @@ export default function Toolbar({ activeTab, onNavigate, onNavigateNew, onBack, 
           {url.startsWith('http://') && (
             <i
               className={copied ? 'fas fa-check' : 'fas fa-globe'}
-              style={{ fontSize: 11, color: copied ? '#4CAF50' : 'var(--text-muted)', flexShrink: 0, cursor: 'pointer' }}
+              style={{ fontSize: 11, color: copied ? '#4CAF50' : 'var(--text-muted)', flexShrink: 0, cursor: 'pointer', WebkitAppRegion: 'no-drag' }}
               title={copied ? 'Copied!' : 'Click to copy URL'}
               onClick={() => {
                 window.electronAPI.copyToClipboard(url);
@@ -391,6 +397,94 @@ export default function Toolbar({ activeTab, onNavigate, onNavigateNew, onBack, 
               })}
             </div>
           )}
+        </div>
+
+        {/* Window controls */}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
+          <button
+            onClick={() => window.electronAPI.minimize()}
+            title="Minimize"
+            style={{
+              width: 32,
+              height: 28,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              WebkitAppRegion: 'no-drag',
+              borderRadius: '6px',
+              fontSize: 11,
+              outline: 'none',
+              boxShadow: 'none'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.12)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <i className="fa-solid fa-minus" />
+          </button>
+          <button
+            onClick={() => window.electronAPI.maximize()}
+            title="Maximize"
+            style={{
+              width: 32,
+              height: 28,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              WebkitAppRegion: 'no-drag',
+              borderRadius: '6px',
+              fontSize: 11,
+              outline: 'none',
+              boxShadow: 'none'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.12)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <i className="fa-regular fa-square" />
+          </button>
+          <button
+            onClick={() => window.electronAPI.closeWindow()}
+            title="Close"
+            style={{
+              width: 32,
+              height: 28,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              WebkitAppRegion: 'no-drag',
+              borderRadius: '6px',
+              fontSize: 11,
+              outline: 'none',
+              boxShadow: 'none'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.12)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <i className="fa-solid fa-x" />
+          </button>
         </div>
       </div>
 

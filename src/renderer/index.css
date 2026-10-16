@@ -38,8 +38,9 @@
   --radius-sm: 12px;
   --radius-xs: 6px;
   --radius-pill: 999px;
-  --sidebar-width: 188px;
-  --toolbar-height: 52px;
+  --viewing-window-radius: 12px; /* CP2-32g: Reduced from 57px to 12px for subtle rounded corners */
+  --sidebar-width: 260px;
+  --toolbar-height: 44px;
   --transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
   
   /* Animation variables */
@@ -162,8 +163,8 @@ input { font-family: inherit; }
 }
 
 .toolbar-btn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius);
   display: flex;
   align-items: center;
@@ -182,7 +183,7 @@ input { font-family: inherit; }
 }
 
 .address-bar {
-  height: 36px;
+  height: 32px;
   background: var(--bg);
   border-radius: var(--radius);
   border: 1px solid var(--border);

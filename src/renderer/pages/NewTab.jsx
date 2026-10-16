@@ -31,7 +31,8 @@ export default function NewTab() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '8px'
+      gap: '8px',
+      paddingTop: '40px'
     }}>
       <div style={{
         fontFamily: 'OpenSauceOne, sans-serif',

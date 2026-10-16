@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, forwardRef } from 'react';
 
-const WebView = forwardRef(({ tab, isActive, isSuspended, isIncognito, webviewRefs, onTabUpdate, onHoveredLink, onContextMenu, onOpenInNewTab, onSearchText, onBack, onForward, onRefresh, activeTabId }, ref) => {
+const WebView = forwardRef(({ tab, isActive, isSuspended, webviewRefs, onTabUpdate, onHoveredLink, onContextMenu, onOpenInNewTab, onSearchText, onBack, onForward, onRefresh, activeTabId }, ref) => {
   const webviewRef = useRef(null);
 
   useEffect(() => {
@@ -173,9 +173,17 @@ const WebView = forwardRef(({ tab, isActive, isSuspended, isIncognito, webviewRe
       */}
       <webview
         ref={webviewRef}
-        partition={isIncognito ? 'incognito' : 'persist:cove'}
+        partition="persist:cove"
         webpreferences="contextIsolation=true, javascript=true, images=true, scrollbounce=true"
-        style={{ width: '100%', height: '100%', border: 'none', display: 'flex' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          display: 'flex',
+          borderTopLeftRadius: 'var(--viewing-window-radius)',
+          borderTopRightRadius: 'var(--viewing-window-radius)',
+          clipPath: 'inset(0 round var(--viewing-window-radius) var(--viewing-window-radius) 0 0)'
+        }}
       />
     </div>
   );
