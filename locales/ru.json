@@ -4,7 +4,7 @@
     "bookmarks": "Закладки",
     "history": "История",
     "downloads": "Загрузки",
-    "settings": "Настройки"
+    "settings": "Предпочтения"
   },
   "settings": {
     "title": "Настройки",
@@ -19,7 +19,9 @@
     "light": "Светлая",
     "dark": "Тёмная",
     "defaultSearchEngine": "Поисковая система по умолчанию",
-    "language": "Язык"
+    "language": "Язык",
+    "darkMode": "Тёмная тема",
+    "darkModeDescription": "Переключить тёмную тему в Cove."
   },
   "toolbar": {
     "back": "Назад",
@@ -33,5 +35,24 @@
   },
   "newTab": {
     "timeFormat": "12-часовой"
+  },
+  "shortcuts": {
+    "addShortcut": "Добавить ярлык",
+    "name": "Название",
+    "url": "URL",
+    "cancel": "Отмена",
+    "done": "Готово",
+    "removeShortcut": "Удалить ярлык"
+  },
+  "tabMenu": {
+    "reloadTab": "Перезагрузить вкладку",
+    "copyUrl": "Копировать URL",
+    "duplicateTab": "Дублировать вкладку",
+    "closeTab": "Закрыть вкладку",
+    "closeOtherTabs": "Закрыть другие вкладки"
+  },
+  "websiteMenu": {
+    "selectAll": "Выбрать все",
+    "inspectElement": "Проверить элемент"
   }
 }

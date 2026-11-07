@@ -4,7 +4,7 @@
     "bookmarks": "Favoris",
     "history": "Historique",
     "downloads": "Téléchargements",
-    "settings": "Paramètres"
+    "settings": "Préférences"
   },
   "settings": {
     "title": "Paramètres",
@@ -19,7 +19,9 @@
     "light": "Clair",
     "dark": "Sombre",
     "defaultSearchEngine": "Moteur de recherche par défaut",
-    "language": "Langue"
+    "language": "Langue",
+    "darkMode": "Mode sombre",
+    "darkModeDescription": "Activer le mode sombre dans Cove."
   },
   "toolbar": {
     "back": "Retour",
@@ -33,5 +35,24 @@
   },
   "newTab": {
     "timeFormat": "12 heures"
+  },
+  "shortcuts": {
+    "addShortcut": "Ajouter un raccourci",
+    "name": "Nom",
+    "url": "URL",
+    "cancel": "Annuler",
+    "done": "Terminé",
+    "removeShortcut": "Supprimer le raccourci"
+  },
+  "tabMenu": {
+    "reloadTab": "Recharger l'onglet",
+    "copyUrl": "Copier l'URL",
+    "duplicateTab": "Dupliquer l'onglet",
+    "closeTab": "Fermer l'onglet",
+    "closeOtherTabs": "Fermer les autres onglets"
+  },
+  "websiteMenu": {
+    "selectAll": "Tout sélectionner",
+    "inspectElement": "Inspecter l'élément"
   }
 }

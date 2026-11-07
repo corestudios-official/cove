@@ -73,7 +73,7 @@ export default function Bookmarks({ onNavigate }) {
                 color: 'var(--text-1)',
                 fontSize: 13,
                 outline: 'none',
-                fontFamily: 'Inter, sans-serif'
+                fontFamily: 'OpenSauceOne, sans-serif'
               }}
             />
             <input
@@ -88,7 +88,7 @@ export default function Bookmarks({ onNavigate }) {
                 color: 'var(--text-1)',
                 fontSize: 13,
                 outline: 'none',
-                fontFamily: 'Inter, sans-serif'
+                fontFamily: 'OpenSauceOne, sans-serif'
               }}
             />
             <div style={{ display: 'flex', gap: 8 }}>
@@ -111,7 +111,7 @@ export default function Bookmarks({ onNavigate }) {
                 style={{
                   background: 'var(--accent)', color: 'white', border: 'none',
                   borderRadius: 'var(--radius-sm)', padding: '8px 16px',
-                  fontSize: 13, cursor: 'pointer', fontFamily: 'Inter, sans-serif'
+                  fontSize: 13, cursor: 'pointer', fontFamily: 'OpenSauceOne, sans-serif'
                 }}
               >
                 Save
@@ -121,7 +121,7 @@ export default function Bookmarks({ onNavigate }) {
                 style={{
                   background: 'var(--surface2)', color: 'var(--text-1)', border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-sm)', padding: '8px 16px',
-                  fontSize: 13, cursor: 'pointer', fontFamily: 'Inter, sans-serif'
+                  fontSize: 13, cursor: 'pointer', fontFamily: 'OpenSauceOne, sans-serif'
                 }}
               >
                 Cancel

@@ -9,10 +9,19 @@ export function useStore(key, defaultValue = null) {
     }).catch(() => setValue(defaultValue));
   }, [key]);
 
-  const setStoredValue = useCallback(async (newValue) => {
-    await window.electronAPI.storeSet(key, newValue);
-    setValue(newValue);
+  // CP2-35: Live-sync when another window (e.g. Preferences) writes the same key
+  useEffect(() => {
+    const off = window.coveAPI?.on?.('store-updated', (k, v) => {
+      if (k === key) setValue(v !== undefined && v !== null ? v : defaultValue);
+    });
+    return typeof off === 'function' ? off : undefined;
   }, [key]);
+
+  const setStoredValue = useCallback(async (newValue) => {
+    const valueToStore = typeof newValue === 'function' ? newValue(value) : newValue;
+    await window.electronAPI.storeSet(key, valueToStore);
+    setValue(valueToStore);
+  }, [key, value]);
 
   return [value, setStoredValue];
 }

@@ -1,7 +1,7 @@
 {
   "name": "cove",
   "productName": "Cove",
-  "version": "2.0.0-beta",
+  "version": "2.1.0",
   "description": "Cove Browser",
   "main": "src/main.js",
   "scripts": {

@@ -1,9 +1,149 @@
-const { app, BrowserWindow, ipcMain, session, nativeTheme, Menu, clipboard, shell, nativeImage, Tray, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, session, nativeTheme, Menu, clipboard, shell, nativeImage, Tray, Notification, webContents } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const store = new Store();
 
 let mainWindow;
+let preferencesWindow = null;
+
+// Broadcast a store mutation to every open window so settings stay in sync
+function broadcastStoreUpdate(key, value) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('store-updated', key, value);
+  }
+}
+
+// CP2-35: Preferences window — separate native-framed window rendering the
+// same bundle at #/preferences. Single instance: focus if already open.
+function createPreferencesWindow() {
+  if (preferencesWindow && !preferencesWindow.isDestroyed()) {
+    if (preferencesWindow.isMinimized()) preferencesWindow.restore();
+    preferencesWindow.focus();
+    return;
+  }
+
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  const prefsWidth = 900;
+  const prefsHeight = 700;
+  let x, y;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const b = mainWindow.getBounds();
+    x = Math.round(b.x + (b.width - prefsWidth) / 2);
+    y = Math.round(b.y + (b.height - prefsHeight) / 2);
+  }
+
+  preferencesWindow = new BrowserWindow({
+    width: prefsWidth,
+    height: prefsHeight,
+    x,
+    y,
+    resizable: false,
+    maximizable: false,
+    minimizable: true,
+    closable: true,
+    autoHideMenuBar: true,
+    title: 'Cove Preferences',
+    icon: path.join(app.getAppPath(), 'icon-256.png'),
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      webviewTag: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false,
+      spellcheck: false,
+      preload: path.join(__dirname, 'preload.js'),
+      sandbox: false // must be false for preload to work with contextBridge
+    }
+  });
+
+  if (isDev) {
+    preferencesWindow.loadURL('http://localhost:8080/#/preferences');
+  } else {
+    preferencesWindow.loadFile(path.join(__dirname, '../dist/index.html'), { hash: '/preferences' });
+  }
+
+  preferencesWindow.on('closed', () => { preferencesWindow = null; });
+}
+
+// CP2-35: Ctrl+, (Cmd+, on macOS) opens Preferences — works from the chrome
+// and from inside webview guests.
+// CP2-38: extended to also handle Ctrl+A (Select All in the focused page) and
+// Ctrl+Shift+I (toggle detached DevTools) via before-input-event, which fires
+// even when a <webview> guest has keyboard focus.
+const shortcutAttached = new WeakSet();
+let activeGuestId = 0;
+
+function activeGuestWebContents() {
+  if (!activeGuestId) return null;
+  try {
+    const wc = webContents.fromId(activeGuestId);
+    return wc && !wc.isDestroyed() ? wc : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function toggleGuestDevTools(wc) {
+  try {
+    if (!wc || wc.isDestroyed()) return;
+    if (wc.isDevToolsOpened()) wc.closeDevTools();
+    else wc.openDevTools({ mode: 'detach' });
+  } catch (e) {}
+}
+
+function attachShortcutHandler(wc) {
+  if (!wc || shortcutAttached.has(wc)) return;
+  shortcutAttached.add(wc);
+  wc.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    const key = (input.key || '').toLowerCase();
+    if (key === ',' && (input.control || input.meta) && !input.alt) {
+      event.preventDefault();
+      createPreferencesWindow();
+      return;
+    }
+    if (key === 'a' && (input.control || input.meta) && !input.alt && !input.shift) {
+      event.preventDefault();
+      try { wc.selectAll(); } catch (e) {}
+      return;
+    }
+    if (key === 'i' && (input.control || input.meta) && input.shift && !input.alt) {
+      event.preventDefault();
+      if (wc.getType && wc.getType() === 'webview') {
+        toggleGuestDevTools(wc);
+      } else {
+        toggleGuestDevTools(activeGuestWebContents());
+      }
+      return;
+    }
+  });
+}
+
+// CP2-38: website context menu — forward each guest webContents' context-menu
+// event to the renderer, which draws Cove's styled menu (Select All /
+// Inspect Element, no icons) at the cursor. cove:// pages never reach this
+// handler because they are React-rendered in the chrome, not in a webview.
+const guestMenuAttached = new WeakSet();
+function attachGuestContextMenu(wc) {
+  if (!wc || guestMenuAttached.has(wc)) return;
+  guestMenuAttached.add(wc);
+  wc.on('context-menu', (event, params) => {
+    try {
+      const url = wc.getURL();
+      if (url && url.startsWith('cove://')) return;
+      event.preventDefault();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('cove:guest-context-menu', {
+          contentsId: wc.id,
+          x: params.x,
+          y: params.y
+        });
+      }
+    } catch (e) {}
+  });
+}
 
 // Load icon using nativeImage to ensure it's properly loaded
 const iconPath = path.join(app.getAppPath(), 'icon-256.png');
@@ -45,6 +185,7 @@ function createWindow() {
       webSecurity: true,
       allowRunningInsecureContent: false,
       experimentalFeatures: false,
+      spellcheck: false,
       preload: path.join(__dirname, 'preload.js'),
       sandbox: false // must be false for preload to work with contextBridge
     }
@@ -67,7 +208,24 @@ function createWindow() {
   });
   mainWindow.on('resize', () => store.set('windowState', mainWindow.getBounds()));
   mainWindow.on('move', () => store.set('windowState', mainWindow.getBounds()));
-  mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    if (preferencesWindow && !preferencesWindow.isDestroyed()) {
+      preferencesWindow.close();
+    }
+  });
+
+  // CP2-35: Ctrl+, on the chrome webContents, and on each webview guest
+  // CP2-38: also Ctrl+A / Ctrl+Shift+I, plus guest context-menu forwarding
+  attachShortcutHandler(mainWindow.webContents);
+  mainWindow.webContents.on('did-attach-webview', () => {
+    for (const wc of webContents.getAllWebContents()) {
+      if (wc.getType() === 'webview') {
+        attachShortcutHandler(wc);
+        attachGuestContextMenu(wc);
+      }
+    }
+  });
 
   // Taskbar button icon is cached by Windows per AppUserModelID; this does not update at runtime through Electron APIs.
   // Confirmed Electron is serving the correct icon everywhere else (tray, Alt+Tab). No further code change will fix this.
@@ -104,6 +262,11 @@ function createWindow() {
 app.whenReady().then(() => {
   // Set up secure session for webviews
   const coveSession = session.fromPartition('persist:cove');
+
+  // CP2-40: Disable the spellchecker on every session. Chromium otherwise
+  // downloads hunspell dictionaries from Google's CDN on first use.
+  session.defaultSession.setSpellCheckerEnabled(false);
+  coveSession.setSpellCheckerEnabled(false);
   
   // Block dangerous permission requests in webviews
   coveSession.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -115,6 +278,13 @@ app.whenReady().then(() => {
   createWindow();
 
   app.on('web-contents-created', (event, contents) => {
+    // CP2-35: ensure Ctrl+, works inside webview guests
+    // CP2-38: also Ctrl+A / Ctrl+Shift+I and the website context menu
+    if (contents.getType() === 'webview') {
+      attachShortcutHandler(contents);
+      attachGuestContextMenu(contents);
+    }
+
     contents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
       if (validatedURL === 'about:blank' && errorCode === -2) return;
       console.error('did-fail-load:', errorCode, errorDescription, validatedURL);
@@ -174,8 +344,65 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 
 ipcMain.handle('store-get', (e, key) => store.get(key));
-ipcMain.handle('store-set', (e, key, value) => { store.set(key, value); return true; });
-ipcMain.handle('store-delete', (e, key) => { store.delete(key); return true; });
+ipcMain.handle('store-set', (e, key, value) => { store.set(key, value); broadcastStoreUpdate(key, value); return true; });
+ipcMain.handle('store-delete', (e, key) => { store.delete(key); broadcastStoreUpdate(key, undefined); return true; });
+
+// CP2-35: Preferences window IPC
+ipcMain.handle('cove:open-preferences', () => { createPreferencesWindow(); return true; });
+ipcMain.handle('cove:open-url-in-main', (e, url) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    mainWindow.webContents.send('cove:open-url', url);
+  }
+  return true;
+});
+
+// CP2-33: Sidebar drag-to-shortcut persistence
+ipcMain.handle('cove:shortcuts-get', () => store.get('shortcuts', []));
+ipcMain.handle('cove:shortcuts-add', (e, { url, favicon }) => {
+  const shortcuts = store.get('shortcuts', []);
+  if (shortcuts.length >= 6) return shortcuts;
+  shortcuts.push({ id: require('crypto').randomUUID(), url, favicon: favicon || null });
+  store.set('shortcuts', shortcuts);
+  return shortcuts;
+});
+ipcMain.handle('cove:shortcuts-remove', (e, id) => {
+  const shortcuts = (store.get('shortcuts', [])).filter(s => s.id !== id);
+  store.set('shortcuts', shortcuts);
+  return shortcuts;
+});
+
+// CP2-38: website context menu actions + active-guest tracking for
+// chrome-focused Ctrl+Shift+I, and DevTools cleanup when a tab is closed.
+ipcMain.handle('cove:guest-select-all', (e, contentsId) => {
+  try {
+    const wc = webContents.fromId(contentsId);
+    if (wc && !wc.isDestroyed()) wc.selectAll();
+  } catch (err) {}
+  return true;
+});
+ipcMain.handle('cove:guest-inspect', (e, contentsId, x, y) => {
+  try {
+    const wc = webContents.fromId(contentsId);
+    if (wc && !wc.isDestroyed()) {
+      if (!wc.isDevToolsOpened()) wc.openDevTools({ mode: 'detach' });
+      wc.inspectElement(x, y);
+    }
+  } catch (err) {}
+  return true;
+});
+ipcMain.handle('cove:set-active-guest', (e, contentsId) => {
+  activeGuestId = contentsId || 0;
+  return true;
+});
+ipcMain.handle('cove:close-tab-guest', (e, contentsId) => {
+  try {
+    const wc = webContents.fromId(contentsId);
+    if (wc && !wc.isDestroyed() && wc.isDevToolsOpened()) wc.closeDevTools();
+  } catch (err) {}
+  return true;
+});
 ipcMain.handle('window-minimize', () => mainWindow?.minimize());
 ipcMain.handle('window-maximize', () => mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize());
 ipcMain.handle('window-close', () => mainWindow?.close());
@@ -190,7 +417,7 @@ ipcMain.handle('clear-session', async () => {
   return true;
 });
 
-ipcMain.handle('get-version', () => '2.0.0 BETA');
+ipcMain.handle('get-version', () => '2.1.0');
 ipcMain.handle('copy-to-clipboard', (event, text) => {
   clipboard.writeText(text);
 });

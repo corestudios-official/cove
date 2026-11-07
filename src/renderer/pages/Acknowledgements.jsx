@@ -3,19 +3,13 @@ import React from 'react';
 const projects = [
   {
     name: 'Claude by Anthropic',
-    description: 'The AI assistant that helped design, build, and debug Cove from the ground up.',
-    license: 'Special Thanks',
-    url: 'https://www.anthropic.com'
-  },
-  {
-    name: 'Anthropic',
-    description: 'The AI safety company behind Claude, whose mission is the responsible development of AI for the long-term benefit of humanity.',
+    description: 'The AI that helped debug Cove',
     license: 'Special Thanks',
     url: 'https://www.anthropic.com'
   },
   {
     name: 'Windsurf by Codeium',
-    description: 'The AI-powered code editor that wrote and iterated on every line of Cove\'s codebase.',
+    description: 'The AI-powered code editor that helped with writing and iterating Cove\'s codebase',
     license: 'Special Thanks',
     url: 'https://windsurf.com'
   },

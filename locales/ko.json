@@ -4,7 +4,7 @@
     "bookmarks": "북마크",
     "history": "기록",
     "downloads": "다운로드",
-    "settings": "설정"
+    "settings": "환경설정"
   },
   "settings": {
     "title": "설정",
@@ -19,7 +19,9 @@
     "light": "밝게",
     "dark": "어둡게",
     "defaultSearchEngine": "기본 검색 엔진",
-    "language": "언어"
+    "language": "언어",
+    "darkMode": "다크 모드",
+    "darkModeDescription": "Cove에서 다크 모드를 전환합니다."
   },
   "toolbar": {
     "back": "뒤로",
@@ -33,5 +35,24 @@
   },
   "newTab": {
     "timeFormat": "12시간"
+  },
+  "shortcuts": {
+    "addShortcut": "바로가기 추가",
+    "name": "이름",
+    "url": "URL",
+    "cancel": "취소",
+    "done": "완료",
+    "removeShortcut": "바로가기 제거"
+  },
+  "tabMenu": {
+    "reloadTab": "탭 새로 고침",
+    "copyUrl": "URL 복사",
+    "duplicateTab": "탭 복제",
+    "closeTab": "탭 닫기",
+    "closeOtherTabs": "다른 탭 닫기"
+  },
+  "websiteMenu": {
+    "selectAll": "모두 선택",
+    "inspectElement": "요소 검사"
   }
 }

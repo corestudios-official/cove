@@ -4,7 +4,7 @@
     "bookmarks": "Tanda Buku",
     "history": "Sejarah",
     "downloads": "Muat Turun",
-    "settings": "Tetapan"
+    "settings": "Keutamaan"
   },
   "settings": {
     "title": "Tetapan",
@@ -19,7 +19,9 @@
     "light": "Cerah",
     "dark": "Gelap",
     "defaultSearchEngine": "Enjin Carian Lalai",
-    "language": "Bahasa"
+    "language": "Bahasa",
+    "darkMode": "Mod Gelap",
+    "darkModeDescription": "Togol mod gelap dalam Cove."
   },
   "toolbar": {
     "back": "Undur",
@@ -33,5 +35,24 @@
   },
   "newTab": {
     "timeFormat": "12-jam"
+  },
+  "shortcuts": {
+    "addShortcut": "Tambah Pintasan",
+    "name": "Nama",
+    "url": "URL",
+    "cancel": "Batal",
+    "done": "Selesai",
+    "removeShortcut": "Buang Pintasan"
+  },
+  "tabMenu": {
+    "reloadTab": "Muat Semula Tab",
+    "copyUrl": "Salin URL",
+    "duplicateTab": "Duplikasi Tab",
+    "closeTab": "Tutup Tab",
+    "closeOtherTabs": "Tutup Tab Lain"
+  },
+  "websiteMenu": {
+    "selectAll": "Pilih Semua",
+    "inspectElement": "Periksa Elemen"
   }
 }

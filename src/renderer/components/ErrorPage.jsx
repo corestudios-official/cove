@@ -10,7 +10,7 @@ export default function ErrorPage({ tab, onRefresh, onHome }) {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: 'Inter, sans-serif',
+      fontFamily: 'OpenSauceOne, sans-serif',
       padding: 40
     }}>
       <i className="fas fa-exclamation-circle" style={{ fontSize: 48, color: 'var(--text-3)', marginBottom: 24 }} />

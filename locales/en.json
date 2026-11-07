@@ -4,7 +4,7 @@
     "bookmarks": "Bookmarks",
     "history": "History",
     "downloads": "Downloads",
-    "settings": "Settings"
+    "settings": "Preferences"
   },
   "settings": {
     "title": "Settings",
@@ -19,7 +19,9 @@
     "light": "Light",
     "dark": "Dark",
     "defaultSearchEngine": "Default Search Engine",
-    "language": "Language"
+    "language": "Language",
+    "darkMode": "Dark Mode",
+    "darkModeDescription": "Toggle dark mode across Cove."
   },
   "toolbar": {
     "back": "Back",
@@ -33,5 +35,24 @@
   },
   "newTab": {
     "timeFormat": "12-hour"
+  },
+  "shortcuts": {
+    "addShortcut": "Add Shortcut",
+    "name": "Name",
+    "url": "URL",
+    "cancel": "Cancel",
+    "done": "Done",
+    "removeShortcut": "Remove Shortcut"
+  },
+  "tabMenu": {
+    "reloadTab": "Reload Tab",
+    "copyUrl": "Copy URL",
+    "duplicateTab": "Duplicate Tab",
+    "closeTab": "Close Tab",
+    "closeOtherTabs": "Close Other Tabs"
+  },
+  "websiteMenu": {
+    "selectAll": "Select All",
+    "inspectElement": "Inspect Element"
   }
 }

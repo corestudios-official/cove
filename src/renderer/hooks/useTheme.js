@@ -31,6 +31,25 @@ export function useTheme() {
     initTheme();
   }, []);
 
+  // CP2-35: Live-sync theme when changed from the Preferences window
+  useEffect(() => {
+    const off = window.coveAPI?.on?.('store-updated', async (key, value) => {
+      if (key !== 'theme') return;
+      let dark;
+      if (value === 'dark') dark = true;
+      else if (value === 'light') dark = false;
+      else dark = await window.electronAPI.getNativeTheme();
+      setIsDark(dark);
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      try {
+        await window.electronAPI.setBackgroundColor(dark ? '#111318' : '#F4F6FB');
+      } catch(e) {
+        console.warn('Could not update background color:', e);
+      }
+    });
+    return typeof off === 'function' ? off : undefined;
+  }, []);
+
   const setTheme = async (mode) => {
     let dark = false;
     if (mode === 'dark') {

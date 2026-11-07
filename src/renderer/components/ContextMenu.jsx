@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export default function ContextMenu({ items, x, y, onClose }) {
   const menuRef = useRef(null);
+  const [size, setSize] = useState(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -14,19 +15,31 @@ export default function ContextMenu({ items, x, y, onClose }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
-  const menuWidth = 180;
-  const menuHeight = items.length * 40;
+  // CP2-38(A): measure the real menu size after mount, then clamp so the menu
+  // flips inward instead of clipping when it would overflow the window.
+  useLayoutEffect(() => {
+    if (menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      setSize({ w: rect.width, h: rect.height });
+    }
+  }, [items]);
 
-  const adjustedX = x + menuWidth > window.innerWidth ? window.innerWidth - menuWidth - 10 : x;
-  const adjustedY = y + menuHeight > window.innerHeight ? window.innerHeight - menuHeight - 10 : y;
+  let left = x;
+  let top = y;
+  if (size) {
+    if (left + size.w > window.innerWidth) left = x - size.w;
+    if (top + size.h > window.innerHeight) top = y - size.h;
+    left = Math.max(0, left);
+    top = Math.max(0, top);
+  }
 
   return (
     <div
       ref={menuRef}
       style={{
         position: 'fixed',
-        left: adjustedX,
-        top: adjustedY,
+        left,
+        top,
         zIndex: 10000,
         background: 'var(--surface)',
         border: '1px solid var(--border)',

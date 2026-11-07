@@ -5,13 +5,32 @@
 // CP2-32f FIX: Removed incognito mode entirely
 // CP2-32e FIX: Fixed guestInstanceId crash and missing animation by passing full tabs array to Sidebar
 // (not filtered visibleTabs) and keeping closing tabs in DOM via filter(!tab._deleted || closingIds.has(tab.id))
-import React, { useState, useEffect, useRef } from 'react';
+// CP2-33: Removed shortcuts grid; added drag-to-shortcut drop zone and pinned shortcuts row
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export default function Sidebar({ tabs, activeTabId, activeTab, onTabSelect, onTabClose, onNewTab, onTabReorder, onNavigate, isDark, profile, onDuplicateTab, onDragStart, onDragEnd }) {
+// CP2-40: Favicon resolver for shortcuts — uses the site's own /favicon.ico
+// instead of a third-party favicon service. Returns null for invalid/blank URLs.
+function resolveShortcutFavicon(url) {
+  if (!url || typeof url !== 'string') return null;
+  try {
+    const u = new URL(url);
+    if (!u.hostname) return null;
+    return `${u.origin}/favicon.ico`;
+  } catch {
+    return null;
+  }
+}
+
+export default function Sidebar({ tabs, activeTabId, activeTab, onTabSelect, onTabClose, onNewTab, onTabReorder, onNavigate, isDark, onDuplicateTab, onReloadTab, onCopyTabUrl, onDragStart, onDragEnd, onOpenUrl }) {
   const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState(null);
+  const [menuBox, setMenuBox] = useState(null);
   const [closingIds, setClosingIds] = useState(new Set());
+  const [isDraggingTab, setIsDraggingTab] = useState(false);
+  const [shortcuts, setShortcuts] = useState([]);
+  const [failedFavicons, setFailedFavicons] = useState(new Set());
+  const [deletingId, setDeletingId] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('sidebarWidth');
     return saved ? Math.max(200, Math.min(400, parseInt(saved, 10))) : 260;
@@ -20,6 +39,55 @@ export default function Sidebar({ tabs, activeTabId, activeTab, onTabSelect, onT
   const contextMenuRef = useRef(null);
   const sidebarRef = useRef(null);
   const dragHandleRef = useRef(null);
+
+  // CP2-33: Load persisted shortcuts on mount
+  // CP2-40: rewrite legacy third-party favicon URLs to the site's own /favicon.ico
+  useEffect(() => {
+    window.coveAPI?.invoke('cove:shortcuts-get')
+      .then(list => setShortcuts((list || []).map(s =>
+        s.favicon && s.favicon.includes('google.com/s2/favicons')
+          ? { ...s, favicon: resolveShortcutFavicon(s.url) }
+          : s
+      )))
+      .catch(() => setShortcuts([]));
+  }, []);
+
+  // CP2-33(C): Cancel delete mode when clicking outside any shortcut
+  useEffect(() => {
+    const handleMouseDown = (e) => {
+      if (!e.target.closest?.('.sidebar-shortcut')) {
+        setDeletingId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, []);
+
+  const handleShortcutDrop = (e) => {
+    e.preventDefault();
+    const url = e.dataTransfer.getData('tabUrl');
+    const favicon = e.dataTransfer.getData('tabFavicon');
+    if (!url) return;
+    window.coveAPI.invoke('cove:shortcuts-add', { url, favicon })
+      .then(updated => setShortcuts(updated || []))
+      .catch(() => {});
+  };
+
+  const handleShortcutDelete = (id) => {
+    window.coveAPI.invoke('cove:shortcuts-remove', id)
+      .then(updated => setShortcuts(updated || []))
+      .catch(() => {});
+    setDeletingId(null);
+  };
+
+  const openOrFocusTab = (url) => {
+    const existing = tabs.find(t => t.url === url && !t._deleted);
+    if (existing) {
+      onTabSelect(existing.id);
+    } else if (onOpenUrl) {
+      onOpenUrl(url);
+    }
+  };
 
   // Persist sidebar width to localStorage
   useEffect(() => {
@@ -32,14 +100,33 @@ export default function Sidebar({ tabs, activeTabId, activeTab, onTabSelect, onT
     document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
   }, []);
 
+  // Measure the open context menu so it can be kept inside the window bounds
+  useLayoutEffect(() => {
+    if (!contextMenu || !contextMenuRef.current) return;
+    const rect = contextMenuRef.current.getBoundingClientRect();
+    setMenuBox({ w: rect.width, h: rect.height });
+  }, [contextMenu]);
+
+  // Close the tab context menu on outside click, Esc, scroll, and window blur
   useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
     const handleClickOutside = (e) => {
       if (contextMenuRef.current && contextMenuRef.current.contains(e.target)) return;
-      setContextMenu(null);
+      close();
     };
+    const onKeyDown = (e) => { if (e.key === 'Escape') close(); };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('keydown', onKeyDown);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('blur', close);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('blur', close);
+    };
+  }, [contextMenu]);
 
   // Clean up closingIds after animation completes (240ms)
   useEffect(() => {
@@ -95,6 +182,38 @@ export default function Sidebar({ tabs, activeTabId, activeTab, onTabSelect, onT
           transform: translateX(-100%);
           transition: transform 240ms ease-in;
         }
+        .sidebar-shortcut {
+          width: 100%;
+          height: 38px;
+          border-radius: 10px;
+          background: var(--bg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          flex-shrink: 0;
+          position: relative;
+        }
+        .sidebar-shortcut:hover {
+          background: var(--hover-bg);
+        }
+        .sidebar-shortcut .shortcut-favicon,
+        .sidebar-shortcut .shortcut-delete-icon {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          transition: opacity 0.15s ease;
+        }
+        .sidebar-shortcut img.shortcut-favicon {
+          width: 18px;
+          height: 18px;
+          object-fit: contain;
+        }
+        .sidebar-shortcut .shortcut-delete-icon {
+          font-size: 14px;
+          color: var(--text-muted);
+        }
       `}</style>
       <div
         ref={sidebarRef}
@@ -125,6 +244,105 @@ export default function Sidebar({ tabs, activeTabId, activeTab, onTabSelect, onT
           }}
         />
 
+        {/* Drop zone reveal area — expands when a tab drag starts */}
+        <div style={{
+          height: isDraggingTab ? 72 : 0,
+          overflow: 'hidden',
+          flexShrink: 0,
+          transition: 'all 0.2s ease'
+        }}>
+          <div
+            onDragOver={e => e.preventDefault()}
+            onDrop={handleShortcutDrop}
+            style={{
+              width: '100%',
+              height: 72,
+              padding: '8px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              opacity: isDraggingTab ? 1 : 0,
+              transition: 'opacity 0.2s ease',
+              WebkitAppRegion: 'no-drag',
+              boxSizing: 'border-box'
+            }}
+          >
+            <i className="fas fa-thumbtack" style={{ fontSize: 11, color: 'var(--text-muted)' }} />
+            <span style={{
+              fontFamily: 'OpenSauceOne, sans-serif',
+              fontSize: 10,
+              color: 'var(--text-secondary, #888)'
+            }}>
+              Drop tab to add shortcut
+            </span>
+          </div>
+        </div>
+
+        {/* Pinned shortcuts row */}
+        {shortcuts.length > 0 && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 6,
+            padding: '6px 10px',
+            flexShrink: 0,
+            WebkitAppRegion: 'no-drag'
+          }}>
+            {shortcuts.map(shortcut => {
+              const isDeleting = deletingId === shortcut.id;
+              return (
+                <div
+                  key={shortcut.id}
+                  className="sidebar-shortcut"
+                  onClick={() => {
+                    if (!isDeleting) openOrFocusTab(shortcut.url);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setDeletingId(shortcut.id);
+                  }}
+                  title={shortcut.url}
+                >
+                  {shortcut.favicon && !failedFavicons.has(shortcut.id) ? (
+                    <img
+                      className="shortcut-favicon"
+                      src={shortcut.favicon}
+                      alt=""
+                      onError={() => setFailedFavicons(prev => new Set(prev).add(shortcut.id))}
+                      style={{
+                        opacity: isDeleting ? 0 : 1,
+                        pointerEvents: isDeleting ? 'none' : 'auto'
+                      }}
+                    />
+                  ) : (
+                    <i
+                      className="fas fa-globe shortcut-favicon"
+                      style={{
+                        fontSize: 16,
+                        color: 'var(--text-muted)',
+                        opacity: isDeleting ? 0 : 1,
+                        pointerEvents: isDeleting ? 'none' : 'auto'
+                      }}
+                    />
+                  )}
+                  <i
+                    className="fa-solid fa-trash shortcut-delete-icon"
+                    style={{
+                      opacity: isDeleting ? 1 : 0,
+                      pointerEvents: isDeleting ? 'auto' : 'none',
+                      cursor: 'pointer'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleShortcutDelete(shortcut.id);
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Tabs list */}
         <div style={{
           flex: 1,
@@ -152,7 +370,13 @@ export default function Sidebar({ tabs, activeTabId, activeTab, onTabSelect, onT
                 <div
                   key={tab.id}
                   draggable
-                  onDragStart={e => e.dataTransfer.setData('tabIndex', String(index))}
+                  onDragStart={e => {
+                    e.dataTransfer.setData('tabIndex', String(index));
+                    e.dataTransfer.setData('tabUrl', tab.url || '');
+                    e.dataTransfer.setData('tabFavicon', tab.favicon || resolveShortcutFavicon(tab.url) || '');
+                    setIsDraggingTab(true);
+                  }}
+                  onDragEnd={() => setIsDraggingTab(false)}
                   onDragOver={e => e.preventDefault()}
                   onDrop={e => {
                     e.preventDefault();
@@ -298,85 +522,103 @@ export default function Sidebar({ tabs, activeTabId, activeTab, onTabSelect, onT
         </div>
       </div>
 
-      {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          style={{
-            position: 'fixed',
-            top: contextMenu.y,
-            left: contextMenu.x,
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            padding: 4,
-            minWidth: 180,
-            zIndex: 99999,
-            boxShadow: 'var(--shadow-md)',
-            animation: 'fadeIn 150ms ease-in-out'
-          }}>
-          <button
-            onMouseDown={() => handleContextMenuClose(contextMenu.tabId)}
-            className="sidebar-item"
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              textAlign: 'left',
-              border: 'none',
-              background: 'transparent',
-              fontSize: 13,
-              color: 'var(--text)',
-              cursor: 'pointer',
-              display: 'block',
-              fontFamily: 'OpenSauceOne, sans-serif',
-              transition: 'background-color 150ms ease-in-out'
-            }}
-          >
-            Close Tab
-          </button>
-          <button
-            onMouseDown={() => {
-              tabs.filter(t => t.id !== contextMenu.tabId).forEach(t => handleCloseTab(t.id));
+      {contextMenu && (() => {
+        const menuTab = tabs.find(tb => tb.id === contextMenu.tabId);
+        const canReload = !!menuTab && !menuTab.url?.startsWith('cove://');
+        const menuItems = [
+          {
+            icon: 'fa-rotate-right',
+            label: t('tabMenu.reloadTab'),
+            disabled: !canReload,
+            action: () => onReloadTab && onReloadTab(contextMenu.tabId)
+          },
+          {
+            icon: 'fa-link',
+            label: t('tabMenu.copyUrl'),
+            action: () => onCopyTabUrl && onCopyTabUrl(contextMenu.tabId)
+          },
+          {
+            icon: 'fa-clone',
+            label: t('tabMenu.duplicateTab'),
+            action: () => onDuplicateTab && onDuplicateTab(contextMenu.tabId)
+          },
+          {
+            icon: 'fa-xmark',
+            label: t('tabMenu.closeTab'),
+            action: () => handleContextMenuClose(contextMenu.tabId)
+          },
+          {
+            icon: 'fa-xmarks-lines',
+            label: t('tabMenu.closeOtherTabs'),
+            action: () => {
+              tabs.filter(tb => tb.id !== contextMenu.tabId && !tb._deleted).forEach(tb => handleCloseTab(tb.id));
               setContextMenu(null);
-            }}
-            className="sidebar-item"
+            }
+          }
+        ];
+
+        const menuW = menuBox?.w ?? 190;
+        const menuH = menuBox?.h ?? 210;
+        const menuX = Math.max(0, Math.min(contextMenu.x, window.innerWidth - menuW - 8));
+        const menuY = Math.max(0, Math.min(contextMenu.y, window.innerHeight - menuH - 8));
+
+        const itemStyle = {
+          width: '100%',
+          padding: '8px 12px',
+          textAlign: 'left',
+          border: 'none',
+          background: 'transparent',
+          fontSize: 13,
+          color: 'var(--text)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          fontFamily: 'OpenSauceOne, sans-serif',
+          transition: 'background-color 150ms ease-in-out'
+        };
+
+        return (
+          <div
+            ref={contextMenuRef}
             style={{
-              width: '100%',
-              padding: '8px 12px',
-              textAlign: 'left',
-              border: 'none',
-              background: 'transparent',
-              fontSize: 13,
-              color: 'var(--text)',
-              cursor: 'pointer',
-              display: 'block',
-              fontFamily: 'OpenSauceOne, sans-serif',
-              transition: 'background-color 150ms ease-in-out'
-            }}
-          >
-            Close Other Tabs
-          </button>
-          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-          <button
-            onMouseDown={() => { onDuplicateTab(contextMenu.tabId); setContextMenu(null); }}
-            className="sidebar-item"
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              textAlign: 'left',
-              border: 'none',
-              background: 'transparent',
-              fontSize: 13,
-              color: 'var(--text)',
-              cursor: 'pointer',
-              display: 'block',
-              fontFamily: 'OpenSauceOne, sans-serif',
-              transition: 'background-color 150ms ease-in-out'
-            }}
-          >
-            Duplicate Tab
-          </button>
-        </div>
-      )}
+              position: 'fixed',
+              top: menuY,
+              left: menuX,
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              padding: 4,
+              minWidth: 190,
+              zIndex: 99999,
+              boxShadow: 'var(--shadow-md)',
+              animation: 'fadeIn 150ms ease-in-out',
+              visibility: menuBox ? 'visible' : 'hidden'
+            }}>
+            {menuItems.map((item) => (
+              <button
+                key={item.label}
+                disabled={item.disabled}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  if (item.disabled) return;
+                  item.action();
+                  setContextMenu(null);
+                }}
+                className={item.disabled ? undefined : 'sidebar-item'}
+                style={{
+                  ...itemStyle,
+                  opacity: item.disabled ? 0.4 : 1,
+                  cursor: item.disabled ? 'default' : 'pointer'
+                }}
+              >
+                <i className={`fas ${item.icon}`} style={{ width: 14, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }} />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
     </>
   );
 }

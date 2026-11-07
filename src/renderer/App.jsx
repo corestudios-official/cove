@@ -16,7 +16,6 @@ import NewTab from './pages/NewTab';
 import Bookmarks from './pages/Bookmarks';
 import History from './pages/History';
 import Downloads from './pages/Downloads';
-import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Acknowledgements from './pages/Acknowledgements';
 import PasswordManager from './pages/PasswordManager';
@@ -27,7 +26,6 @@ function App() {
   const { isDark, setTheme } = useTheme();
   const { t, i18n } = useTranslation();
   const [settings, setSettings] = useStore('settings', { homepage: 'cove://home' });
-  const [profile, setProfile] = useStore('profile', { displayName: 'User', avatar: null });
   const [bookmarks, setBookmarks] = useStore('bookmarks', []);
   const [searchEngine, setSearchEngine] = useStore('searchEngine', 'google');
   const [language, setLanguage] = useStore('language', 'en');
@@ -43,7 +41,6 @@ function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
   const [backOnline, setBackOnline] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
   const [isSidebarDragging, setIsSidebarDragging] = useState(false);
 
@@ -56,7 +53,6 @@ function App() {
   }, [language, i18n]);
 
   const resolvedSettings = settings ?? { homepage: 'cove://home' };
-  const resolvedProfile = profile ?? { displayName: 'User', avatar: null };
 
   // Auto-open new tab when all tabs are closed (including on first launch)
   useEffect(() => {
@@ -219,6 +215,11 @@ function App() {
     const wv = webviewRefs.current[tabId];
     if (wv) {
       try { wv.src = 'about:blank'; } catch (e) {}
+      // CP2-38: closing a tab also closes its detached DevTools window
+      try {
+        const guestId = wv.getWebContentsId?.();
+        if (guestId) window.coveAPI?.invoke?.('cove:close-tab-guest', guestId);
+      } catch (e) {}
     }
   }, [activeTabId, tabs]);
 
@@ -303,8 +304,6 @@ function App() {
       'cove://bookmarks': 'Bookmarks',
       'cove://history': 'History',
       'cove://downloads': 'Downloads',
-      'cove://profile': 'Profile',
-      'cove://settings': 'Settings',
       'cove://acknowledgements': 'Acknowledgements',
       'cove://cpm': 'Cove Password Manager'
     };
@@ -336,9 +335,68 @@ function App() {
     if (wv) try { wv.reload(); } catch(e) {}
   }, [activeTabId]);
 
-  const handleContextMenu = useCallback((items, x, y) => {
-    setContextMenu({ items, x, y });
-  }, []);
+  // CP2-37: Reload a specific tab's webview from the sidebar context menu.
+  // cove:// internal pages have no reloadable webview, so they are skipped.
+  const reloadTab = useCallback((tabId) => {
+    const tab = tabs.find(t => t.id === tabId);
+    if (!tab || tab.url?.startsWith('cove://')) return;
+    const wv = webviewRefs.current[tabId];
+    if (!wv) return;
+    try { wv.reload(); } catch(e) {}
+  }, [tabs]);
+
+  // CP2-37: Copy a specific tab's current URL to the clipboard.
+  const copyTabUrl = useCallback((tabId) => {
+    const tab = tabs.find(t => t.id === tabId);
+    if (!tab) return;
+    let url = tab.url;
+    try {
+      const liveUrl = webviewRefs.current[tabId]?.getURL?.();
+      if (liveUrl && liveUrl !== 'about:blank') url = liveUrl;
+    } catch(e) {}
+    window.electronAPI.copyToClipboard(url);
+  }, [tabs]);
+
+  // CP2-38(A): website context menu — guest webContents forward their
+  // context-menu events through the main process; we draw Cove's styled menu
+  // (Select All / Inspect Element, no icons) with its top-left corner exactly
+  // at the cursor position reported by the event params.
+  useEffect(() => {
+    const off = window.coveAPI?.on?.('cove:guest-context-menu', (p) => {
+      if (!p) return;
+      setContextMenu({
+        x: p.x || 0,
+        y: p.y || 0,
+        items: [
+          {
+            label: t('websiteMenu.selectAll'),
+            action: () => window.coveAPI.invoke('cove:guest-select-all', p.contentsId)
+          },
+          {
+            label: t('websiteMenu.inspectElement'),
+            action: () => window.coveAPI.invoke('cove:guest-inspect', p.contentsId, p.x, p.y)
+          }
+        ]
+      });
+    });
+    return typeof off === 'function' ? off : undefined;
+  }, [activeTabId, t]);
+
+  // CP2-38: report the active tab's guest webContents id so chrome-focused
+  // Ctrl+Shift+I can toggle DevTools for the active website (0 = none).
+  useEffect(() => {
+    const tab = tabs.find(tb => tb.id === activeTabId);
+    if (!tab || tab._deleted || tab.url?.startsWith('cove://')) {
+      window.coveAPI?.invoke?.('cove:set-active-guest', 0);
+      return;
+    }
+    try {
+      const id = webviewRefs.current[activeTabId]?.getWebContentsId?.();
+      window.coveAPI?.invoke?.('cove:set-active-guest', id || 0);
+    } catch (e) {
+      window.coveAPI?.invoke?.('cove:set-active-guest', 0);
+    }
+  }, [activeTabId, tabs]);
 
   const handleOpenInNewTab = useCallback((url) => {
     const t = {
@@ -355,6 +413,46 @@ function App() {
     setTabs(prev => [...prev, t]);
     setActiveTabId(t.id);
   }, []);
+
+  // CP2-35: Open a URL requested from the Preferences window
+  const openUrlInMainWindow = useCallback((url) => {
+    if (!url) return;
+    if (url.startsWith('cove://')) {
+      const pageTitles = {
+        'cove://home': 'New Tab',
+        'cove://bookmarks': 'Bookmarks',
+        'cove://history': 'History',
+        'cove://downloads': 'Downloads',
+        'cove://acknowledgements': 'Acknowledgements',
+        'cove://cpm': 'Cove Password Manager'
+      };
+      const existing = tabs.find(t => t.url === url);
+      if (existing) {
+        setActiveTabId(existing.id);
+      } else {
+        const t = {
+          id: crypto.randomUUID(),
+          url,
+          title: pageTitles[url] || 'New Tab',
+          favicon: null,
+          isLoading: false,
+          canGoBack: false,
+          canGoForward: false,
+          lastActive: Date.now(),
+          suspended: false
+        };
+        setTabs(prev => [...prev, t]);
+        setActiveTabId(t.id);
+      }
+    } else {
+      handleOpenInNewTab(url);
+    }
+  }, [tabs, handleOpenInNewTab]);
+
+  useEffect(() => {
+    const off = window.coveAPI?.on?.('cove:open-url', openUrlInMainWindow);
+    return typeof off === 'function' ? off : undefined;
+  }, [openUrlInMainWindow]);
 
   const handleSearchText = useCallback((text) => {
     const searchUrls = {
@@ -394,9 +492,7 @@ function App() {
       }
       if (e.altKey && e.key === 'Home') { e.preventDefault(); navigateTab(activeTabId, 'cove://home'); }
       if (e.key === 'Escape') {
-        if (showSettingsModal) {
-          setShowSettingsModal(false);
-        } else if (showFindBar) {
+        if (showFindBar) {
           setShowFindBar(false);
           setFindQuery('');
           const wv = webviewRefs.current[activeTabId];
@@ -409,24 +505,27 @@ function App() {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [createNewTab, closeTab, activeTabId, toggleBookmark, zoomIn, zoomOut, resetZoom, showFindBar, showSettingsModal, navigateTab]);
+  }, [createNewTab, closeTab, activeTabId, toggleBookmark, zoomIn, zoomOut, resetZoom, showFindBar, navigateTab]);
 
   const isInternal = activeTab?.url?.startsWith('cove://');
 
   const renderPage = () => {
-    const props = { onNavigate: (url) => navigateTab(activeTabId, url), profile, setProfile, settings, setSettings, isDark, setTheme, searchEngine, setSearchEngine, language, setLanguage };
+    const props = { onNavigate: (url) => navigateTab(activeTabId, url), settings, setSettings, isDark, setTheme, searchEngine, setSearchEngine, language, setLanguage };
     switch (activeTab?.url) {
       case 'cove://home': case 'cove://newtab': return <NewTab {...props} />;
       case 'cove://bookmarks': return <Bookmarks {...props} />;
       case 'cove://history': return <History {...props} />;
       case 'cove://downloads': return <Downloads {...props} />;
-      case 'cove://profile': return <Profile {...props} />;
-      case 'cove://settings': return null;
       case 'cove://acknowledgements': return <Acknowledgements {...props} onNavigate={(url) => navigateTab(activeTabId, url)} />;
       case 'cove://cpm': return <PasswordManager {...props} onNavigate={(url) => navigateTab(activeTabId, url)} />;
       default: return <div style={{ padding: 20 }}>Page not found</div>;
     }
   };
+
+  // CP2-35: Preferences window renders the same bundle at #/preferences
+  if (window.location.hash.startsWith('#/preferences')) {
+    return <PreferencesView />;
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'row', height: '100vh', overflow: 'hidden', background: 'var(--bg)', position: 'relative' }} onClick={() => setContextMenu(null)}>
@@ -444,28 +543,18 @@ function App() {
         onNewTab={createNewTab}
         onTabReorder={handleTabReorder}
         onDuplicateTab={duplicateTab}
+        onReloadTab={reloadTab}
+        onCopyTabUrl={copyTabUrl}
         onNavigate={(url) => {
-          // Always open internal cove:// pages in a new tab, except settings which opens as modal
+          // Always open internal cove:// pages in a new tab
           const pageTitles = {
             'cove://bookmarks': 'Bookmarks',
             'cove://history': 'History',
             'cove://downloads': 'Downloads',
-            'cove://settings': 'Settings',
-            'cove://profile': 'Profile',
             'cove://home': 'New Tab',
             'cove://acknowledgements': 'Acknowledgements',
             'cove://cpm': 'Cove Password Manager'
           };
-
-          if (url === 'cove://settings') {
-            setShowSettingsModal(true);
-            // Close any existing settings tab
-            const settingsTab = tabs.find(t => t.url === 'cove://settings');
-            if (settingsTab) {
-              closeTab(settingsTab.id);
-            }
-            return;
-          }
 
           if (url.startsWith('cove://')) {
             // Check if a tab with this URL already exists
@@ -494,9 +583,9 @@ function App() {
           }
         }}
         isDark={isDark}
-        profile={profile}
         onDragStart={() => setIsSidebarDragging(true)}
         onDragEnd={() => setIsSidebarDragging(false)}
+        onOpenUrl={handleOpenInNewTab}
       />
       <div style={{
         flex: 1,
@@ -608,7 +697,6 @@ function App() {
                   webviewRefs={webviewRefs}
                   onTabUpdate={updateTab}
                   onHoveredLink={setHoveredLink}
-                  onContextMenu={handleContextMenu}
                   onOpenInNewTab={handleOpenInNewTab}
                   onSearchText={handleSearchText}
                   onBack={handleBack}
@@ -663,104 +751,6 @@ function App() {
         </div>
       </div>
 
-      {/* Settings Modal */}
-      {showSettingsModal && (
-        <>
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 9998,
-              background: 'rgba(0, 0, 0, 0.5)',
-              animation: 'fadeIn 150ms ease-in-out'
-            }}
-            onClick={() => {
-              setShowSettingsModal(false);
-              if (activeTab?.url === 'cove://settings') {
-                navigateTab(activeTabId, 'cove://home');
-              }
-            }}
-          />
-          <div
-            style={{
-              position: 'fixed',
-              top: '48px',
-              bottom: '24px',
-              left: '24px',
-              right: '24px',
-              zIndex: 9999,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              pointerEvents: 'none'
-            }}
-          >
-            <div
-              style={{
-                width: '100%',
-                height: '100%',
-                background: 'var(--webview-bg)',
-                borderRadius: 'var(--radius)',
-                overflow: 'hidden',
-                animation: 'fadeIn 150ms ease-in-out',
-                pointerEvents: 'auto',
-                position: 'relative'
-              }}
-            >
-              <button
-                onClick={() => setShowSettingsModal(false)}
-                style={{
-                  position: 'absolute',
-                  top: '16px',
-                  right: '16px',
-                  zIndex: 1,
-                  fontSize: '18px',
-                  fontFamily: 'Space Mono, monospace',
-                  color: 'var(--text-muted)',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: 0,
-                  width: 24,
-                  height: 24,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'opacity 150ms ease-in-out'
-                }}
-                onMouseEnter={(e) => e.target.style.opacity = '0.7'}
-                onMouseLeave={(e) => e.target.style.opacity = '1'}
-              >
-                ×
-              </button>
-              <Settings
-                onNavigate={(url) => {
-                  setShowSettingsModal(false);
-                  setTimeout(() => {
-                    if (url !== 'cove://settings') {
-                      navigateTab(activeTabId, url);
-                    } else {
-                      navigateTab(activeTabId, 'cove://home');
-                    }
-                  }, 0);
-                }}
-                onOpenInNewTab={handleOpenInNewTab}
-                profile={profile}
-                setProfile={setProfile}
-                settings={settings}
-                setSettings={setSettings}
-                isDark={isDark}
-                setTheme={setTheme}
-                searchEngine={searchEngine}
-                setSearchEngine={setSearchEngine}
-                language={language}
-                setLanguage={setLanguage}
-              />
-            </div>
-          </div>
-        </>
-      )}
-
       {/* Context Menu */}
       {contextMenu && (
         <ContextMenu
@@ -770,6 +760,40 @@ function App() {
           onClose={() => setContextMenu(null)}
         />
       )}
+    </div>
+  );
+}
+
+// CP2-35: Standalone Preferences window content — same Settings component,
+// backed by the same electron-store keys so changes sync to the main window.
+function PreferencesView() {
+  const { isDark, setTheme } = useTheme();
+  const { i18n } = useTranslation();
+  const [settings, setSettings] = useStore('settings', { homepage: 'cove://home' });
+  const [searchEngine, setSearchEngine] = useStore('searchEngine', 'google');
+  const [language, setLanguage] = useStore('language', 'en');
+
+  useEffect(() => {
+    document.title = 'Cove Preferences';
+    if (language) i18n.changeLanguage(language);
+  }, [language, i18n]);
+
+  const openInMain = (url) => window.coveAPI?.invoke('cove:open-url-in-main', url);
+
+  return (
+    <div style={{ width: '100%', height: '100vh', background: 'var(--webview-bg)', overflow: 'hidden' }}>
+      <Settings
+        onNavigate={openInMain}
+        onOpenInNewTab={openInMain}
+        settings={settings}
+        setSettings={setSettings}
+        isDark={isDark}
+        setTheme={setTheme}
+        searchEngine={searchEngine}
+        setSearchEngine={setSearchEngine}
+        language={language}
+        setLanguage={setLanguage}
+      />
     </div>
   );
 }

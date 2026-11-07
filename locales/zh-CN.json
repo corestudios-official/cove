@@ -4,7 +4,7 @@
     "bookmarks": "书签",
     "history": "历史记录",
     "downloads": "下载",
-    "settings": "设置"
+    "settings": "偏好设置"
   },
   "settings": {
     "title": "设置",
@@ -19,7 +19,9 @@
     "light": "浅色",
     "dark": "深色",
     "defaultSearchEngine": "默认搜索引擎",
-    "language": "语言"
+    "language": "语言",
+    "darkMode": "深色模式",
+    "darkModeDescription": "在 Cove 中切换深色模式。"
   },
   "toolbar": {
     "back": "后退",
@@ -33,5 +35,24 @@
   },
   "newTab": {
     "timeFormat": "12小时制"
+  },
+  "shortcuts": {
+    "addShortcut": "添加快捷方式",
+    "name": "名称",
+    "url": "URL",
+    "cancel": "取消",
+    "done": "完成",
+    "removeShortcut": "移除快捷方式"
+  },
+  "tabMenu": {
+    "reloadTab": "重新加载标签页",
+    "copyUrl": "复制网址",
+    "duplicateTab": "复制标签页",
+    "closeTab": "关闭标签页",
+    "closeOtherTabs": "关闭其他标签页"
+  },
+  "websiteMenu": {
+    "selectAll": "全选",
+    "inspectElement": "检查元素"
   }
 }

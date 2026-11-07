@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, forwardRef } from 'react';
 
-const WebView = forwardRef(({ tab, isActive, isSuspended, webviewRefs, onTabUpdate, onHoveredLink, onContextMenu, onOpenInNewTab, onSearchText, onBack, onForward, onRefresh, activeTabId }, ref) => {
+const WebView = forwardRef(({ tab, isActive, isSuspended, webviewRefs, onTabUpdate, onHoveredLink, onOpenInNewTab, onSearchText, onBack, onForward, onRefresh, activeTabId }, ref) => {
   const webviewRef = useRef(null);
 
   useEffect(() => {
@@ -98,34 +98,6 @@ const WebView = forwardRef(({ tab, isActive, isSuspended, webviewRefs, onTabUpda
       });
     };
 
-    const handleContextMenuEvent = (e) => {
-      const params = e.params;
-      let items = [];
-      if (params.linkURL) {
-        items = [
-          { label: 'Open in new tab', action: () => onOpenInNewTab && onOpenInNewTab(params.linkURL) },
-          { label: 'Copy link', action: () => window.electronAPI.copyToClipboard(params.linkURL) }
-        ];
-      } else if (params.mediaType === 'image') {
-        items = [
-          { label: 'Save image', action: () => window.electronAPI.saveImage(params.srcURL) },
-          { label: 'Copy image', action: () => window.electronAPI.copyImage(params.srcURL) }
-        ];
-      } else if (params.selectionText) {
-        items = [
-          { label: 'Copy', action: () => window.electronAPI.copyToClipboard(params.selectionText) },
-          { label: 'Search', action: () => onSearchText && onSearchText(params.selectionText) }
-        ];
-      } else {
-        items = [
-          { label: 'Back', action: () => onBack && onBack() },
-          { label: 'Forward', action: () => onForward && onForward() },
-          { label: 'Reload', action: () => onRefresh && onRefresh() }
-        ];
-      }
-      if (onContextMenu) onContextMenu(items, e.x, e.y);
-    };
-
     wv.addEventListener('dom-ready', onReady);
     wv.addEventListener('page-title-updated', onTitle);
     wv.addEventListener('page-favicon-updated', onFavicon);
@@ -135,7 +107,6 @@ const WebView = forwardRef(({ tab, isActive, isSuspended, webviewRefs, onTabUpda
     wv.addEventListener('did-stop-loading', onStop);
     wv.addEventListener('update-target-url', onHover);
     wv.addEventListener('did-fail-load', onFailLoad);
-    wv.addEventListener('context-menu', handleContextMenuEvent);
 
     const observer = new MutationObserver(applyTheme);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
@@ -150,10 +121,9 @@ const WebView = forwardRef(({ tab, isActive, isSuspended, webviewRefs, onTabUpda
       wv.removeEventListener('did-stop-loading', onStop);
       wv.removeEventListener('update-target-url', onHover);
       wv.removeEventListener('did-fail-load', onFailLoad);
-      wv.removeEventListener('context-menu', handleContextMenuEvent);
       observer.disconnect();
     };
-  }, [tab.id, onTabUpdate, onHoveredLink, onContextMenu, onOpenInNewTab, onSearchText, onBack, onForward, onRefresh, activeTabId]);
+  }, [tab.id, onTabUpdate, onHoveredLink, onOpenInNewTab, onSearchText, onBack, onForward, onRefresh, activeTabId]);
 
   return (
     <div
@@ -174,6 +144,7 @@ const WebView = forwardRef(({ tab, isActive, isSuspended, webviewRefs, onTabUpda
       <webview
         ref={webviewRef}
         partition="persist:cove"
+        spellCheck={false}
         webpreferences="contextIsolation=true, javascript=true, images=true, scrollbounce=true"
         style={{
           width: '100%',

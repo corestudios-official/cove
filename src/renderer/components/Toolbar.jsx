@@ -133,9 +133,8 @@ export default function Toolbar({ activeTab, onNavigate, onNavigateNew, onBack, 
     { label: t('sidebar.history'), action: () => onNavigate('cove://history') },
     { label: t('sidebar.downloads'), action: () => onNavigate('cove://downloads') },
     { label: 'Cove Password Manager', action: () => onNavigate('cove://cpm') },
-    { label: 'Profile', action: () => onNavigate('cove://profile') },
     null,
-    { label: t('sidebar.settings'), action: () => onNavigate('cove://settings') }
+    { label: t('sidebar.settings'), action: () => window.coveAPI?.invoke('cove:open-preferences') }
   ];
 
   return (
@@ -260,25 +259,23 @@ export default function Toolbar({ activeTab, onNavigate, onNavigateNew, onBack, 
               {hoveredLink}
             </span>
           )}
-        </div>
-        
-        {/* Suggestions dropdown */}
-        {suggestions.length > 0 && focused && (
-          <div ref={suggestionsRef} style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            marginTop: 4,
-            zIndex: 9999,
-            boxShadow: 'var(--shadow-md)',
-            overflow: 'hidden',
-            animation: 'fadeIn 150ms ease-in-out',
-            maxWidth: '835px'
-          }}>
+          {/* Suggestions dropdown — rendered inside the address bar so its
+              width and horizontal position match the bar exactly */}
+          {suggestions.length > 0 && focused && (
+            <div ref={suggestionsRef} onClick={(e) => e.stopPropagation()} style={{
+              position: 'absolute',
+              top: '100%',
+              left: '-1px',
+              right: '-1px',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              marginTop: 4,
+              zIndex: 9999,
+              boxShadow: 'var(--shadow-md)',
+              overflow: 'hidden',
+              animation: 'fadeIn 150ms ease-in-out'
+            }}>
             {suggestions.map((suggestion, index) => (
               <button
                 key={index}
@@ -313,8 +310,9 @@ export default function Toolbar({ activeTab, onNavigate, onNavigateNew, onBack, 
                 {suggestion}
               </button>
             ))}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Right buttons */}

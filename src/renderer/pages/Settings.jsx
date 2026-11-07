@@ -8,7 +8,7 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
   const { t } = useTranslation();
   const [theme, setThemeState] = useState('system');
   const [cleared, setCleared] = useState(false);
-  const [version, setVersion] = useState('2.0.0 BETA');
+  const [version, setVersion] = useState('2.1.0');
   const [activeTab, setActiveTab] = useState('Appearance');
   const [updateStatus, setUpdateStatus] = useState('default'); // default, checking, up-to-date, update-found, error
   const [updateMessage, setUpdateMessage] = useState('');
@@ -20,7 +20,7 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
 
   useEffect(() => {
     window.electronAPI.storeGet('theme').then(t => setThemeState(t || 'system'));
-    window.electronAPI.getVersion().then(v => setVersion(v || '2.0.0'));
+    window.electronAPI.getVersion().then(v => setVersion(v || '2.1.0'));
   }, []);
 
   // CP2-6 FIX: Digital Wellbeing display was not updating live because it only read
@@ -128,11 +128,11 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
   };
 
   const tabConfig = [
-    { key: 'Appearance', label: t('settings.appearance') },
-    { key: 'Search Engine', label: t('settings.searchEngine') },
-    { key: 'Keyboard Shortcuts', label: t('settings.keyboardShortcuts') },
-    { key: 'Privacy', label: t('settings.privacy') },
-    { key: 'Digital Wellbeing', label: t('settings.digitalWellbeing') },
+    { key: 'Appearance', label: t('settings.appearance'), icon: 'fas fa-palette' },
+    { key: 'Search Engine', label: t('settings.searchEngine'), icon: 'fas fa-magnifying-glass' },
+    { key: 'Keyboard Shortcuts', label: t('settings.keyboardShortcuts'), icon: 'fas fa-keyboard' },
+    { key: 'Privacy', label: t('settings.privacy'), icon: 'fas fa-shield-halved' },
+    { key: 'Digital Wellbeing', label: t('settings.digitalWellbeing'), icon: 'fas fa-heart-pulse' },
     null, // separator
     { key: 'About Cove', label: t('settings.aboutCove') }
   ];
@@ -146,34 +146,88 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
         return (
           <div className="content-panel" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
             <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text)', marginBottom: 24, fontFamily: 'OpenSauceOne, sans-serif' }}>{t('settings.appearance')}</h2>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 14, color: 'var(--text)', display: 'block', marginBottom: 8, fontFamily: 'OpenSauceOne, sans-serif' }}>{t('settings.theme')}</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {['system', 'light', 'dark'].map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => { setTheme(mode); setThemeState(mode); }}
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: 'var(--radius)',
-                      border: theme === mode ? '2px solid var(--accent)' : '1px solid var(--border)',
-                      background: theme === mode ? 'var(--active-bg)' : 'transparent',
-                      color: 'var(--text)',
-                      fontSize: 14,
-                      cursor: 'pointer',
-                      textTransform: 'capitalize',
-                      fontFamily: 'OpenSauceOne, sans-serif',
-                      transition: 'background-color 150ms ease-in-out'
-                    }}
-                  >
-                    {mode === 'system' ? t('settings.system') : mode === 'light' ? t('settings.light') : t('settings.dark')}
-                  </button>
-                ))}
+            {/* Dark Mode toggle card */}
+            <div style={{
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              padding: '20px 24px',
+              marginBottom: 16,
+              background: 'var(--surface)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <i className="fas fa-moon" style={{ fontSize: 20, color: 'var(--text-muted)', width: 24, textAlign: 'center' }} />
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', fontFamily: 'OpenSauceOne, sans-serif' }}>
+                    {t('settings.darkMode')}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'OpenSauceOne, sans-serif', marginTop: 2 }}>
+                    {t('settings.darkModeDescription')}
+                  </div>
+                </div>
               </div>
+              <button
+                onClick={() => setTheme(isDark ? 'light' : 'dark')}
+                role="switch"
+                aria-checked={isDark}
+                aria-label={t('settings.darkMode')}
+                style={{
+                  width: 42,
+                  height: 24,
+                  borderRadius: 'var(--radius-pill)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  flexShrink: 0,
+                  background: isDark ? 'var(--accent)' : 'var(--border)',
+                  transition: 'background-color 150ms ease-in-out',
+                  padding: 0
+                }}
+              >
+                <div style={{
+                  position: 'absolute',
+                  top: 3,
+                  left: isDark ? 21 : 3,
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  background: '#FFFFFF',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                  transition: 'left 150ms ease-in-out'
+                }} />
+              </button>
             </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 14, color: 'var(--text)', display: 'block', marginBottom: 8, fontFamily: 'OpenSauceOne, sans-serif' }}>{t('settings.language')}</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+
+            {/* Language dropdown card */}
+            <div style={{
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              padding: '20px 24px',
+              background: 'var(--surface)'
+            }}>
+              <label style={{ fontSize: 14, color: 'var(--text)', display: 'block', marginBottom: 12, fontWeight: 500, fontFamily: 'OpenSauceOne, sans-serif' }}>
+                {t('settings.language')}
+              </label>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                style={{
+                  width: '100%',
+                  maxWidth: 320,
+                  padding: '10px 14px',
+                  fontSize: 14,
+                  color: 'var(--text)',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'OpenSauceOne, sans-serif'
+                }}
+              >
                 {[
                   { code: 'en', name: 'English' },
                   { code: 'ms', name: 'Bahasa Malaysia' },
@@ -184,25 +238,9 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
                   { code: 'ja', name: '日本語' },
                   { code: 'ru', name: 'Русский' }
                 ].map(lang => (
-                  <button
-                    key={lang.code}
-                    onClick={() => setLanguage(lang.code)}
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: 'var(--radius)',
-                      border: language === lang.code ? '2px solid var(--accent)' : '1px solid var(--border)',
-                      background: language === lang.code ? 'var(--active-bg)' : 'transparent',
-                      color: 'var(--text)',
-                      fontSize: 14,
-                      cursor: 'pointer',
-                      fontFamily: 'OpenSauceOne, sans-serif',
-                      transition: 'background-color 150ms ease-in-out'
-                    }}
-                  >
-                    {lang.name}
-                  </button>
+                  <option key={lang.code} value={lang.code}>{lang.name}</option>
                 ))}
-              </div>
+              </select>
             </div>
           </div>
         );
@@ -243,7 +281,7 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
         return (
           <div className="content-panel" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
             <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text)', marginBottom: 24, fontFamily: 'OpenSauceOne, sans-serif' }}>{t('settings.keyboardShortcuts')}</h2>
-            <div style={{ marginBottom: 24 }}>
+            <div>
               <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 12, fontFamily: 'OpenSauceOne, sans-serif' }}>Navigation</h3>
               {[
                 ['Ctrl + T', t('sidebar.newTab')],
@@ -270,7 +308,7 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
               ))}
             </div>
             <div>
-              <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 12, fontFamily: 'OpenSauceOne, sans-serif' }}>Page</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginTop: 24, marginBottom: 12, fontFamily: 'OpenSauceOne, sans-serif' }}>Page</h3>
               {[
                 ['Ctrl + F', 'Find in Page'],
                 ['Ctrl + D', t('toolbar.bookmark')],
@@ -278,6 +316,29 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
                 ['Ctrl + -', 'Zoom Out'],
                 ['Ctrl + 0', 'Reset Zoom'],
                 ['Escape', 'Stop Loading / Close Find Bar']
+              ].map(([key, action]) => (
+                <div key={key} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid var(--border)` }}>
+                  <kbd style={{
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-xs)',
+                    padding: '3px 8px',
+                    fontSize: 12,
+                    fontFamily: 'Space Mono, monospace',
+                    color: 'var(--text)'
+                  }}>
+                    {key}
+                  </kbd>
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'OpenSauceOne, sans-serif' }}>{action}</span>
+                </div>
+              ))}
+            </div>
+            <div>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginTop: 24, marginBottom: 12, fontFamily: 'OpenSauceOne, sans-serif' }}>General</h3>
+              {[
+                ['Ctrl + ,', 'Open Preferences'],
+                ['Ctrl + Shift + I', 'Toggle Developer Tools'],
+                ['Ctrl + A', 'Select All']
               ].map(([key, action]) => (
                 <div key={key} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid var(--border)` }}>
                   <kbd style={{
@@ -647,7 +708,7 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
               <div style={{ 
                 height: '6px', 
                 background: 'var(--border)', 
-                borderRadius: '3px', 
+                borderRadius: '3px',
                 marginBottom: 20,
                 overflow: 'hidden'
               }}>
@@ -690,7 +751,7 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
                         flex: 1, 
                         height: '6px', 
                         background: 'var(--border)', 
-                        borderRadius: '3px', 
+                        borderRadius: '3px',
                         margin: '0 12px',
                         overflow: 'hidden'
                       }}>
@@ -917,20 +978,22 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             style={{
-              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '9px 12px',
               border: 'none',
               background: activeTab === tab.key ? 'var(--active-bg)' : 'transparent',
               color: activeTab === tab.key ? 'var(--text)' : 'var(--text-muted)',
-              fontSize: '0.78rem',
-              fontWeight: 400,
+              fontSize: '0.82rem',
+              fontWeight: activeTab === tab.key ? 500 : 400,
               cursor: 'pointer',
               textAlign: 'left',
-              fontFamily: 'Space Mono, monospace',
-              borderRadius: 'var(--radius-sm)',
-              margin: '0 14px',
-              borderLeft: activeTab === tab.key ? '3px solid var(--accent)' : '3px solid transparent',
+              fontFamily: 'OpenSauceOne, sans-serif',
+              borderRadius: 'var(--radius)',
+              margin: '2px 10px',
               transition: 'background-color 150ms ease-in-out',
-              width: 'calc(100% - 28px)'
+              width: 'calc(100% - 20px)'
             }}
             onMouseEnter={(e) => {
               if (activeTab !== tab.key) {
@@ -943,6 +1006,7 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
               }
             }}
           >
+            {tab.icon && <i className={tab.icon} style={{ fontSize: 12, width: 16, textAlign: 'center', color: activeTab === tab.key ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }} />}
             {tab.label}
           </button>
         ))}
@@ -963,20 +1027,22 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               style={{
-                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '9px 12px',
                 border: 'none',
                 background: activeTab === tab.key ? 'var(--active-bg)' : 'transparent',
                 color: activeTab === tab.key ? 'var(--text)' : 'var(--text-muted)',
-                fontSize: '0.78rem',
-                fontWeight: 400,
+                fontSize: '0.82rem',
+                fontWeight: activeTab === tab.key ? 500 : 400,
                 cursor: 'pointer',
                 textAlign: 'left',
-                fontFamily: 'Space Mono, monospace',
-                borderRadius: 'var(--radius-sm)',
-                margin: '0 14px',
-                borderLeft: activeTab === tab.key ? '3px solid var(--accent)' : '3px solid transparent',
+                fontFamily: 'OpenSauceOne, sans-serif',
+                borderRadius: 'var(--radius)',
+                margin: '2px 10px',
                 transition: 'background-color 150ms ease-in-out',
-                width: 'calc(100% - 28px)'
+                width: 'calc(100% - 20px)'
               }}
               onMouseEnter={(e) => {
                 if (activeTab !== tab.key) {
@@ -989,6 +1055,7 @@ export default function Settings({ onNavigate, onOpenInNewTab, settings, setSett
                 }
               }}
             >
+              {tab.icon && <i className={tab.icon} style={{ fontSize: 12, width: 16, textAlign: 'center', color: activeTab === tab.key ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }} />}
               {tab.label}
             </button>
           ))}

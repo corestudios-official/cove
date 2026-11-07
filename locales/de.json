@@ -19,7 +19,9 @@
     "light": "Hell",
     "dark": "Dunkel",
     "defaultSearchEngine": "Standard-Suchmaschine",
-    "language": "Sprache"
+    "language": "Sprache",
+    "darkMode": "Dunkler Modus",
+    "darkModeDescription": "Dunklen Modus in Cove umschalten."
   },
   "toolbar": {
     "back": "Zurück",
@@ -33,5 +35,24 @@
   },
   "newTab": {
     "timeFormat": "12-Stunden"
+  },
+  "shortcuts": {
+    "addShortcut": "Verknüpfung hinzufügen",
+    "name": "Name",
+    "url": "URL",
+    "cancel": "Abbrechen",
+    "done": "Fertig",
+    "removeShortcut": "Verknüpfung entfernen"
+  },
+  "tabMenu": {
+    "reloadTab": "Tab neu laden",
+    "copyUrl": "URL kopieren",
+    "duplicateTab": "Tab duplizieren",
+    "closeTab": "Tab schließen",
+    "closeOtherTabs": "Andere Tabs schließen"
+  },
+  "websiteMenu": {
+    "selectAll": "Alles auswählen",
+    "inspectElement": "Element untersuchen"
   }
 }
